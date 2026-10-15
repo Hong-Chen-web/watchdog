@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>看门狗 · 后台设计说明书 v1.0</title>
+<style>
+:root{color-scheme:dark;--bg:#0a0e1c;--card:rgba(255,255,255,.04);--bd:rgba(255,255,255,.09);--t1:rgba(255,255,255,.93);--t2:rgba(255,255,255,.58);--t3:rgba(255,255,255,.4);--acc:#0a84ff;--up:#ff5a5f;--dn:#30d158;--warn:#ffd60a;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:radial-gradient(1100px 700px at 75% -10%,rgba(56,88,168,.35),transparent 60%),radial-gradient(800px 600px at -10% 110%,rgba(80,60,140,.25),transparent 55%),var(--bg);color:var(--t1);font-family:-apple-system,"PingFang SC","SF Pro Text",sans-serif;line-height:1.75;padding:48px 20px;-webkit-font-smoothing:antialiased}
+.wrap{max-width:980px;margin:0 auto}
+h1{font-size:30px;letter-spacing:-.01em;margin-bottom:6px}
+.sub{color:var(--t2);font-size:14px;margin-bottom:34px;padding-bottom:18px;border-bottom:1px solid var(--bd)}
+h2{font-size:20px;margin:44px 0 14px;padding-left:12px;border-left:3px solid var(--acc)}
+h3{font-size:15.5px;margin:26px 0 10px;color:var(--t1)}
+p,li{font-size:14px;color:var(--t2)}
+b{color:var(--t1)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:18px 22px;margin:14px 0}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin:12px 0}
+th{text-align:left;color:var(--t3);font-weight:600;padding:7px 10px;border-bottom:1px solid var(--bd);font-size:11px;letter-spacing:.03em}
+td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.05);color:var(--t2);vertical-align:top}
+td:first-child{white-space:nowrap}
+code,pre{font-family:var(--mono)}
+code{background:rgba(255,255,255,.07);padding:1.5px 6px;border-radius:5px;font-size:12px;color:#9ecbff}
+pre{background:rgba(0,0,0,.35);border:1px solid var(--bd);border-radius:12px;padding:16px 18px;font-size:11.5px;line-height:1.65;overflow-x:auto;color:#c8d6f0;margin:12px 0}
+.kw{color:#ff9f0a}.cm{color:var(--t3)}.str{color:#7fe0a0}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 10px;border-radius:99px;margin-right:6px;vertical-align:1px}
+.tag.get{background:rgba(48,209,88,.13);color:#6fe08f}
+.tag.post{background:rgba(10,132,255,.15);color:#7cb8ff}
+.tag.put{background:rgba(255,159,10,.13);color:#ffc46b}
+.tag.patch{background:rgba(191,90,242,.14);color:#cf9bff}
+.tag.del{background:rgba(255,90,95,.13);color:#ff898c}
+.ok{color:var(--dn)}.bad{color:var(--up)}
+.toc{columns:2;column-gap:30px;font-size:13px}
+.toc a{color:var(--t2);text-decoration:none;display:block;padding:3px 0}
+.toc a:hover{color:#fff}
+.note{font-size:12px;color:var(--t3);background:rgba(255,214,10,.06);border:1px solid rgba(255,214,10,.18);border-radius:10px;padding:10px 14px;margin:12px 0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:760px){.grid2{grid-template-columns:1fr}.toc{columns:1}}
+svg text{font-family:-apple-system,"PingFang SC",sans-serif}
+.num{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body><div class="wrap">
+
+<h1>看门狗(Watchdog)· 后台设计说明书</h1>
+<div class="sub">v1.0 · 2026-10-04 · 项目名:看门狗 Watchdog · 对应前台原型 v0.6 · 决策依据:Numbers 账本实测结构 + chan-monitor 8787 现有 API + Mole status-go</div>
+
+<div class="card"><div class="toc">
+<a>1. 背景与目标</a><a>2. 总体架构</a><a>3. 技术选型</a><a>4. SQLite 数据模型</a><a>5. 接口设计(按模块)</a><a>6. 数据接入:Numbers 导入管线</a><a>7. 数据接入:chan-monitor 桥</a><a>8. 缓存 · 调度 · 降级</a><a>9. 存储位置 · 迁移 · 备份</a><a>10. 错误模型与日志</a><a>11. 目录结构</a><a>12. 实施里程碑</a>
+</div></div>
+
+<h2>1. 背景与目标</h2>
+<p>前台原型(v0.6)已定版:macOS 深色仪表盘、九个可装配模块、Mole CLI 实时桥、中英双语。本说明书定义<b>生产后台</b>:SQLite 存储 + 模块化本地 HTTP 接口 + 两个既有数据源的接入管线。</p>
+<div class="card"><b>既有资产盘点(实测)</b>
+<table>
+<tr><th>数据源</th><th>现状</th><th>接入结论</th></tr>
+<tr><td><b>Numbers 账本</b><br><code>~/Library/Mobile Documents/com~apple~Numbers/Documents/支出统计支出预算.numbers</code></td><td>"简单预算"模板:年度预算汇总页(8 类别 × 总年预算/单月预算/实际支出/差额)+「交易」明细表(日期/商户/类别/金额)</td><td>JXA 调 Numbers 无头导出 CSV → 幂等导入;类别与预算随首次导入落库</td></tr>
+<tr><td><b>chan-monitor</b><br><code>127.0.0.1:8787</code>(FastAPI)</td><td>已有只读接口:<code>/api/state</code>、<code>/api/recommended/tail</code>(选股轮次)、<code>/api/backtest</code>、<code>/api/futures/state</code>、<code>/api/stock/{code}</code></td><td>不改缠论服务,后台作<b>代理+落库缓存</b>,挂了降级读缓存</td></tr>
+<tr><td><b>Mole CLI</b><br><code>Mole/bin/status-go --json</code></td><td>已编译验证,健康分/CPU/内存/GPU/磁盘/网络/电池/进程</td><td>spawn 子进程 + 2.5s 缓存(原型已实现,原样收编)</td></tr>
+</table></div>
+<p><b>设计原则:</b>① 单机本地,零云依赖,数据不出设备;② 每模块一组接口,模块可拆装=接口可停用;③ 外部数据源(腾讯/新浪/东财/缠论/Mole)统一在后台收口,前台永远只认识 <code>/api/*</code>;④ 所有写操作幂等可重放。</p>
+
+<h2>2. 总体架构</h2>
+<div class="card" style="padding:22px">
+<svg viewBox="0 0 920 400" width="100%" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgba(10,132,255,.16)"/><stop offset="1" stop-color="rgba(10,132,255,.05)"/></linearGradient>
+<linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgba(191,90,242,.13)"/><stop offset="1" stop-color="rgba(191,90,242,.04)"/></linearGradient>
+</defs>
+<rect x="10" y="10" width="900" height="86" rx="12" fill="url(#g1)" stroke="rgba(10,132,255,.35)"/>
+<text x="30" y="38" fill="#fff" font-size="14" font-weight="700">Tauri 2 壳(macOS App)</text>
+<text x="30" y="60" fill="rgba(255,255,255,.55)" font-size="11">Webview 加载前端 dist · 窗口/托盘/开机自启 · 前台原型 v0.6 直接演进</text>
+<text x="30" y="80" fill="rgba(255,255,255,.4)" font-size="11">React + 双语字典 + 装配布局(localStorage → 迁移到 /api/settings)</text>
+
+<rect x="10" y="118" width="900" height="120" rx="12" fill="rgba(255,255,255,.045)" stroke="rgba(255,255,255,.12)"/>
+<text x="30" y="146" fill="#fff" font-size="14" font-weight="700">本地后台服务 · 127.0.0.1:8790(FastAPI 单进程)</text>
+<g font-size="11" fill="rgba(255,255,255,.6)">
+<rect x="30" y="160" width="128" height="26" rx="8" fill="rgba(10,132,255,.14)" stroke="rgba(10,132,255,.3)"/><text x="94" y="177" text-anchor="middle">/api/todo</text>
+<rect x="168" y="160" width="128" height="26" rx="8" fill="rgba(10,132,255,.14)" stroke="rgba(10,132,255,.3)"/><text x="232" y="177" text-anchor="middle">/api/ledger</text>
+<rect x="306" y="160" width="128" height="26" rx="8" fill="rgba(10,132,255,.14)" stroke="rgba(10,132,255,.3)"/><text x="370" y="177" text-anchor="middle">/api/market</text>
+<rect x="444" y="160" width="128" height="26" rx="8" fill="rgba(10,132,255,.14)" stroke="rgba(10,132,255,.3)"/><text x="508" y="177" text-anchor="middle">/api/portfolio</text>
+<rect x="582" y="160" width="128" height="26" rx="8" fill="rgba(10,132,255,.14)" stroke="rgba(10,132,255,.3)"/><text x="646" y="177" text-anchor="middle">/api/backtest</text>
+<rect x="720" y="160" width="170" height="26" rx="8" fill="rgba(10,132,255,.14)" stroke="rgba(10,132,255,.3)"/><text x="805" y="177" text-anchor="middle">/api/sysmon + /api/modules</text>
+<text x="30" y="212" fill="rgba(255,255,255,.45)">调度器:行情快线 3s · sysmon 按需 · 持仓 60s · 资产快照 14:55 · 归档 20:00 | 缓存层:内存 TTL + SQLite 落库</text>
+</g>
+
+<rect x="10" y="260" width="440" height="56" rx="12" fill="rgba(48,209,88,.08)" stroke="rgba(48,209,88,.25)"/>
+<text x="30" y="284" fill="#9ef0b4" font-size="12" font-weight="700">SQLite(workbench.db · WAL)</text>
+<text x="30" y="302" fill="rgba(255,255,255,.5)" font-size="10.5">todos · ledger_* · holdings · watchlist · snapshots · backtest_* · modules · settings</text>
+
+<rect x="470" y="260" width="440" height="130" rx="12" fill="url(#g2)" stroke="rgba(191,90,242,.3)"/>
+<text x="490" y="286" fill="#e3c8ff" font-size="12" font-weight="700">外部数据源(全部由后台收口)</text>
+<g font-size="10.5" fill="rgba(255,255,255,.55)">
+<text x="490" y="308">· chan-monitor 8787(HTTP 代理,持仓/轮次/回测/期货)</text>
+<text x="490" y="326">· Numbers 账本(JXA 导出 CSV,幂等导入)</text>
+<text x="490" y="344">· Mole status-go(spawn --json,2.5s 缓存)</text>
+<text x="490" y="362">· 腾讯/新浪/东财行情(复用缠论项目拉数模块)</text>
+<text x="490" y="380">· 飞书推送(透传缠论配置,仅信号模块)</text>
+</g>
+<path d="M460,178 C480,178 470,288 452,288" stroke="rgba(255,255,255,.25)" fill="none" stroke-width="1.5" marker-end="url(#a)"/>
+</svg>
+</div>
+<p><b>关键决策:</b>后台是<b>独立本地 HTTP 服务</b>而非 Tauri 内嵌命令,理由:① 开发期浏览器可直接调试(前台原型今天的形态无缝延续);② chan-monitor、Mole、server.js 三个既有进程都以 HTTP 形态存在,统一范式;③ 后端与 chan-monitor 同为 Python,行情拉取/容灾代码(push2 双域名、限流退避)直接复用。Tauri 壳负责窗口化与开机自启,退出时一并拉起/回收后台进程(sidecar 模式)。</p>
+
+<h2>3. 技术选型</h2>
+<table>
+<tr><th>层</th><th>选型</th><th>理由</th></tr>
+<tr><td>桌面壳</td><td>Tauri 2 + React</td><td>内存/体积远优于 Electron;Wealthfolio 同路线;前台已是纯 Web</td></tr>
+<tr><td>后台</td><td>Python 3.11 + FastAPI + uvicorn(127.0.0.1:8790)</td><td>与 chan-monitor 同栈,拉数模块整段复用;自动 OpenAPI 文档(/docs)即调试台</td></tr>
+<tr><td>存储</td><td>SQLite 3(WAL 模式)+ <code>sqlite-migrate</code> 风格自研迁移</td><td>单文件、零运维、Time Machine 天然覆盖</td></tr>
+<tr><td>Numbers 解析</td><td>JXA(osascript)驱动 Numbers 导出 CSV → pandas 读取</td><td>.numbers 为私有 IWA 格式,无可靠三方解析库;本机有 Numbers App,官方路径最稳</td></tr>
+<tr><td>系统监控</td><td>Mole <code>status-go --json</code> 子进程</td><td>已编译验证;作者官方预留的机器可读出口</td></tr>
+<tr><td>前端数据层</td><td>轮询(3s/60s)+ 预留 SSE</td><td>单机场景轮询足够;SSE 接口在 v2 预留 <code>text/event-stream</code></td></tr>
+</table>
+
+<h2>4. SQLite 数据模型</h2>
+<p>库文件:<code>~/Library/Application Support/Workbench/workbench.db</code>。所有时间戳存 <b>ISO8601 本地时区字符串</b>;金额存 REAL(元);日期存 <code>YYYY-MM-DD</code>。<code>PRAGMA journal_mode=WAL; foreign_keys=ON;</code></p>
+<pre>
+<span class="cm">-- 装配与设置(前台 localStorage 的正式归宿)</span>
+<span class="kw">CREATE TABLE</span> module_config (
+  module_id TEXT PRIMARY KEY,          <span class="cm">-- portfolio/backtest/todo/ledger/market/sysmon/strategy/futures/calendar</span>
+  enabled   INTEGER NOT NULL DEFAULT 1,
+  sort      INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL
+);
+<span class="kw">CREATE TABLE</span> settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);  <span class="cm">-- lang/theme/poll_interval 等 JSON 值</span>
+
+<span class="cm">-- ① 待办</span>
+<span class="kw">CREATE TABLE</span> todos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  due_date TEXT,                        <span class="cm">-- YYYY-MM-DD,NULL=无期限</span>
+  priority INTEGER NOT NULL DEFAULT 3,  <span class="cm">-- 1高(红) 2中(黄) 3低(灰)</span>
+  done INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  completed_at TEXT
+);
+<span class="kw">CREATE INDEX</span> idx_todos_due ON todos(due_date, done);
+
+<span class="cm">-- ② 账本(对齐 Numbers"简单预算"模板)</span>
+<span class="kw">CREATE TABLE</span> ledger_categories (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,            <span class="cm">-- 首次导入种子:娱乐/旅游·食物·房屋·医疗·个人物品·其他·旅行·人情</span>
+  name_en TEXT,
+  color TEXT NOT NULL DEFAULT <span class="str">'#8e8e93'</span>,
+  sort INTEGER NOT NULL DEFAULT 0
+);
+<span class="kw">CREATE TABLE</span> ledger_budgets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  category_id INTEGER NOT NULL REFERENCES ledger_categories(id),
+  year INTEGER NOT NULL,
+  annual REAL NOT NULL DEFAULT 0,       <span class="cm">-- Numbers「总年预算」列</span>
+  monthly REAL NOT NULL DEFAULT 0,      <span class="cm">-- Numbers「单月预算」列</span>
+  UNIQUE(category_id, year)
+);
+<span class="kw">CREATE TABLE</span> ledger_entries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  date TEXT NOT NULL,                   <span class="cm">-- 交易日期</span>
+  payee TEXT,                           <span class="cm">-- 商户/描述</span>
+  category_id INTEGER NOT NULL REFERENCES ledger_categories(id),
+  amount REAL NOT NULL,                 <span class="cm">-- 正=收入 负=支出(与 Numbers 金额列符号一致)</span>
+  note TEXT,
+  source TEXT NOT NULL DEFAULT <span class="str">'manual'</span>,  <span class="cm">-- manual | numbers | chan(交易佣金自动记账)</span>
+  external_id TEXT UNIQUE,              <span class="cm">-- numbers导入=sha1(date|payee|amount|category),幂等键</span>
+  created_at TEXT NOT NULL
+);
+<span class="kw">CREATE INDEX</span> idx_ledger_date ON ledger_entries(date);
+
+<span class="cm">-- ③ 行情 · 自选</span>
+<span class="kw">CREATE TABLE</span> watchlist (
+  code TEXT PRIMARY KEY,                <span class="cm">-- 000928</span>
+  name TEXT NOT NULL,
+  note TEXT, sort INTEGER DEFAULT 0, added_at TEXT NOT NULL
+);
+<span class="kw">CREATE TABLE</span> quotes_cache (
+  code TEXT PRIMARY KEY, name TEXT, price REAL, chg_pct REAL,
+  updated_at TEXT NOT NULL
+);
+<span class="kw">CREATE TABLE</span> signals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts TEXT NOT NULL, code TEXT, name TEXT,
+  kind TEXT NOT NULL,                   <span class="cm">-- selection/exit/monitor/futures</span>
+  message TEXT NOT NULL, payload TEXT,  <span class="cm">-- payload 为 JSON</span>
+  read INTEGER NOT NULL DEFAULT 0
+);
+
+<span class="cm">-- ④ 持仓(镜像自 chan-monitor,后台拥有缓存副本)</span>
+<span class="kw">CREATE TABLE</span> chan_rounds (
+  round_id TEXT PRIMARY KEY,            <span class="cm">-- 缠论轮次 id/日期</span>
+  sel_date TEXT NOT NULL, raw TEXT NOT NULL, synced_at TEXT NOT NULL
+);
+<span class="kw">CREATE TABLE</span> holdings (
+  code TEXT NOT NULL, round_id TEXT NOT NULL REFERENCES chan_rounds(round_id),
+  name TEXT, buy_date TEXT, buy_price REAL, shares REAL,
+  status TEXT NOT NULL DEFAULT <span class="str">'holding'</span>,   <span class="cm">-- holding/settled</span>
+  exit_date TEXT, exit_price REAL, exit_why TEXT,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY(code, round_id)
+);
+<span class="kw">CREATE TABLE</span> account_snapshots (   <span class="cm">-- 资产曲线,每日 14:55 由后台落一档</span>
+  date TEXT PRIMARY KEY,
+  cash REAL, market_value REAL, total REAL,
+  source TEXT NOT NULL DEFAULT <span class="str">'chan'</span>
+);
+
+<span class="cm">-- ⑤ 回测(归档导入为主)</span>
+<span class="kw">CREATE TABLE</span> backtest_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  created_at TEXT NOT NULL,
+  label TEXT NOT NULL,                  <span class="cm">-- "3成仓 2019-2026"</span>
+  params TEXT,                          <span class="cm">-- JSON:BT_START/BT_CAPITAL/BT_FRACTION</span>
+  final_equity REAL, total_return REAL, trades INTEGER,
+  win_rate REAL, pl_ratio REAL, worst_hit REAL
+);
+<span class="kw">CREATE TABLE</span> backtest_yearly (
+  run_id INTEGER NOT NULL REFERENCES backtest_runs(id),
+  year INTEGER NOT NULL, return_pct REAL NOT NULL,
+  PRIMARY KEY(run_id, year)
+);
+<span class="kw">CREATE TABLE</span> backtest_curve (
+  run_id INTEGER NOT NULL REFERENCES backtest_runs(id),
+  seq INTEGER NOT NULL, date TEXT, equity REAL,
+  PRIMARY KEY(run_id, seq)
+);
+
+<span class="cm">-- ⑥ 系统监控(滚动 24h,夜间任务裁剪)</span>
+<span class="kw">CREATE TABLE</span> sysmon_samples (
+  ts TEXT PRIMARY KEY,
+  health INTEGER, cpu REAL, mem_pct REAL, net_rx REAL
+);
+<span class="cm">-- ⑦ 同步审计</span>
+<span class="kw">CREATE TABLE</span> sync_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source TEXT NOT NULL, status TEXT NOT NULL,  <span class="cm">-- ok/fail/partial</span>
+  message TEXT, ts TEXT NOT NULL
+);
+</pre>
+
+<h2>5. 接口设计(按模块)</h2>
+<p>统一约定:前缀 <code>/api</code>;JSON 进出;成功直接返回数据对象,失败返回 <code>{"error":{"code":"...","message":"..."}}</code>;<b>每模块一组、互不引用</b>,停用一个模块仅关其路由与调度任务。<code>●</code>=原型已验证的行为原样收编。</p>
+
+<h3>5.0 公共</h3>
+<table>
+<tr><th></th><th>接口</th><th>说明</th></tr>
+<tr><td><span class="tag get">GET</span></td><td><code>/api/health</code></td><td><code>{db:ok, chan:ok|down, mole:ok|down, version}</code> — 各依赖存活探测</td></tr>
+<tr><td><span class="tag get">GET</span></td><td><code>/api/modules</code> ●</td><td>模块装配清单 <code>[{id,name,icon,desc,enabled,sort}]</code>(读 module_config)</td></tr>
+<tr><td><span class="tag put">PUT</span></td><td><code>/api/modules/:id</code></td><td><code>{enabled:bool}</code> 装配/拆装</td></tr>
+<tr><td><span class="tag put">PUT</span></td><td><code>/api/modules/order</code></td><td><code>{order:["portfolio",...]}</code> 排序持久化</td></tr>
+<tr><td><span class="tag get">GET</span>/<span class="tag put">PUT</span></td><td><code>/api/settings</code></td><td>lang / theme / 轮询间隔等(替代 localStorage)</td></tr>
+</table>
+
+<h3>5.1 待办模块 /api/todo</h3>
+<table>
+<tr><th></th><th>接口</th><th>请求/响应要点</th></tr>
+<tr><td><span class="tag get">GET</span></td><td><code>/api/todos?date=2026-10-04&status=open|done|all</code></td><td>按到期日过滤;<code>overdue:true</code> 由响应计算(date&lt;今天且未完成)</td></tr>
+<tr><td><span class="tag post">POST</span></td><td><code>/api/todos</code></td><td><code>{title, due_date?, priority?}</code> → 201+完整对象</td></tr>
+<tr><td><span class="tag patch">PATCH</span></td><td><code>/api/todos/:id</code></td><td>部分更新;<code>{done:true}</code> 时写 completed_at</td></tr>
+<tr><td><span class="tag del">DELETE</span></td><td><code>/api/todos/:id</code></td><td>删除(软删 v2 再说)</td></tr>
+<tr><td><span class="tag get">GET</span></td><td><code>/api/todos/stats?month=</code></td><td>完成率、逾期数、今日剩余</td></tr>
+</table>
+
+<h3>5.2 账本模块 /api/ledger</h3>
+<table>
+<tr><th></th><th>接口</th><th>请求/响应要点</th></tr>
+<tr><td><span class="tag get">GET</span></td><td><code>/api/ledger/summary?month=2026-10</code></td><td><code>{income,expense,net,categories:[{name,color,budget_month,actual,remaining}]}</code> — 前端月度卡一屏数据</td></tr>
+<tr><td><span class="tag get">GET</span></td><td><code>/api/ledger/entries?month=&category=&page=&size=</code></td><td>明细分页,按日期倒序</td></tr>
+<tr><td><span class="tag post">POST</span></td><td><code>/api/ledger/entries</code> ●</td><td><code>{date,payee,category,amount,note?}</code>;source=manual</td></tr>
+<tr><td><span class="tag patch">PATCH</span> / <span class="tag del">DELETE</span></td><td><code>/api/ledger/entries/:id</code></td><td>改/删(仅 manual 与 numbers 导入允许编辑标记)</td></tr>
+<tr><td><span class="tag get">GET</span></td><td><code>/api/ledger/categories</code></td><td>类别+当月预算(合并响应减少请求数)</td></tr>
+<tr><td><span class="tag put">PUT</span></td><td><code>/api/ledger/budgets/:year</code></td><td><code>{category_id,annual,monthly}[]</code> 批量写预算</td></tr>
+<tr><td><span class="tag get">GET</span></td><td><code>/api/ledger/trend?year=2026</code></td><td>12 个月收支/结余序列(年度视图用)</td></tr>
+</table>
+<div class="note">Numbers 预算页的「单月预算/总年预算」直接映射 budgets 表;summary 接口的 remaining 即模板里的「差额」列逻辑,口径完全对齐,用户从 Numbers 迁移无认知成本。</div>
+
+<h3>5.3 行情模块 /api/market</h3>
+<table>
+<tr><th></th><th>接口</th><th>请求/响应要点</th></tr>
+<tr><td><span class="tag get">GET</span></td><td><code>/api/market/quotes</code> ●</td><td>三大指数 + 自选股批量快照(读 quotes_cache,由后台 3s 快线刷新)</td></tr>
+<tr><td><span class="tag get">GET</span></td><td><code>/api/market/watchlist</code> ●</td><td>自选列表(含持仓标记)</td></tr>
+<tr><td><span class="tag post">POST</span>/<span class="tag del">DELETE</span></td><td><code>/api/market/watchlist/:code</code></td><td>加/删自选</td></tr>
+<tr><td><span class="tag get">GET</span></td><td><code>/api/market/kline/:code?days=120&fq=qfq</code></td><td>日 K(复用缠论腾讯 fqkline 拉数,本地缓存 1 次/日)</td></tr>
+<tr><td><span class="tag get">GET</span></td><td><code>/api/market/signals?unread=1</code></td><td>信号流(selection/exit/monitor)</td></tr>
+<tr><td><span class="tag post">POST</span></td><td><code>/api/market/signals/:id/read</code></td><td>已读</td></tr>
+</table>
+
+<h3>5.4 持仓模块 /api/portfolio</h3>
+<table>
+<tr><th></th><th>接口</th><th>请求/响应要点</th></tr>
+<tr><td><span class="tag get">GET</span></td><td><code>/api/portfolio</code> ●</td><td><code>{total,cash,market_value,pct,day_pnl,holdings:[{code,name,cost,price,value,pnl_pct,status,exit_why}]}</code> — 读 holdings+quotes_cache 拼装,60s 同步 chan</td></tr>
+<tr><td><span class="tag get">GET</span></td><td><code>/api/portfolio/history?days=30</code></td><td>资产曲线(account_snapshots)</td></tr>
+<tr><td><span class="tag post">POST</span></td><td><code>/api/portfolio/sync</code></td><td>手动触发一次 chan 同步(等待返回结果)</td></tr>
+</table>
+
+<h3>5.5 回测模块 /api/backtest</h3>
+<table>
+<tr><th></th><th>接口</th><th>请求/响应要点</th></tr>
+<tr><td><span class="tag get">GET</span></td><td><code>/api/backtest/runs</code></td><td>历史回测档案列表</td></tr>
+<tr><td><span class="tag get">GET</span></td><td><code>/api/backtest/runs/:id</code> ●</td><td>KPI+年度收益+资产曲线点(回测卡整卡数据)</td></tr>
+<tr><td><span class="tag post">POST</span></td><td><code>/api/backtest/import</code></td><td>导入 chan-monitor 归档(回测明细 CSV / backtest_year 参数)→ 落 runs/yearly/curve</td></tr>
+<tr><td><span class="tag post">POST</span></td><td><code>/api/backtest/run</code></td><td>透传触发缠论年度回测(异步任务,轮询 <code>/api/backtest/runs/:id</code> 状态)</td></tr>
+</table>
+
+<h3>5.6 系统监控模块 /api/sysmon</h3>
+<table>
+<tr><th></th><th>接口</th><th>请求/响应要点</th></tr>
+<tr><td><span class="tag get">GET</span></td><td><code>/api/sysmon</code> ●</td><td>Mole status-go JSON 原样转发 + 后端追加 <code>history:{cpu:[],mem:[]}</code>(24h 采样)</td></tr>
+<tr><td><span class="tag get">GET</span></td><td><code>/api/sysmon/history?hours=1</code></td><td>sysmon_samples 查询</td></tr>
+</table>
+
+<h3>5.7 策略信号 / 期货 / 日历 / chan 桥</h3>
+<table>
+<tr><th></th><th>接口</th><th>说明</th></tr>
+<tr><td><span class="tag get">GET</span></td><td><code>/api/chan/tail</code> ●</td><td>最近选股轮次(代理 <code>8787/api/recommended/tail</code> + 本地轮次镜像)</td></tr>
+<tr><td><span class="tag get">GET</span></td><td><code>/api/chan/futures</code> ●</td><td>期货 7 品种状态(代理 <code>/api/futures/state</code>)</td></tr>
+<tr><td><span class="tag get">GET</span></td><td><code>/api/calendar?quarter=2026Q4</code></td><td>市场日历(开市日/披露/申购,内置规则生成 + 手工事件表)</td></tr>
+</table>
+
+<h2>6. 数据接入:Numbers 导入管线</h2>
+<div class="card">
+<p><b>触发:</b>手动(设置页「从 Numbers 导入」)或 CLI;<b>可重复执行,幂等。</b></p>
+<pre>
+.numbers 文件(iCloud 路径,含空格转义)
+  │ ① JXA:osascript 驱动 Numbers 打开 → 每个 sheet export 为 CSV → 关闭(不落盘到原文件)
+  ▼
+CSV(交易表 + 年度预算表,存 $TMPDIR,导入完即焚)
+  │ ② 解析:表头按模板识别(日期/商户/类别/金额;预算:类别/总年预算/单月预算)
+  ▼
+  │ ③ 类别映射:先精确匹配 ledger_categories.name;
+  │    未匹配 → 返回 unmatched_categories,由用户在确认界面前缀选择映射后重放
+  ▼
+  │ ④ 幂等键:external_id = sha1(date|payee|amount|category)
+  ▼
+SQLite:INSERT OR IGNORE → ledger_entries / ledger_budgets / categories 种子
+  ▼
+⑤ 返回 {imported:n, skipped:n(重复), unmatched:[...]},写 sync_log
+</pre>
+<p><b>降级链:</b>Numbers App 不在(命令行无 GUI 会话)→ 提示用户在 Numbers 手动「文件→导出→CSV」后走同一解析步骤(⑤ 之前完全一致)。Excel/CSV 手工导出路径是兜底,永远可用。</p>
+<p class="note">实测依据:文件为"简单预算"模板,类别 8 个(娱乐/旅游、食物、房屋、医疗、个人物品、其他、旅行、人情),预算页含总年预算/单月预算/实际支出/差额;交易表列以导入时实际表头核对为准,解析器按列名模糊识别(日期/时间→date,商户/描述→payee,类别→category,金额/数量→amount)。</p>
+</div>
+
+<h2>7. 数据接入:chan-monitor 桥</h2>
+<table>
+<tr><th>工作台表</th><th>来源(chan-monitor)</th><th>同步策略</th></tr>
+<tr><td>holdings / chan_rounds</td><td><code>GET 8787/api/recommended/tail</code> + <code>/api/state</code></td><td>60s 轮询 + 14:55 事件后立即拉;整轮 upsert(round_id 维度)</td></tr>
+<tr><td>account_snapshots</td><td>持仓估值 × quotes_cache</td><td>每日 14:55 落一档(收盘口径,与缠论结算一致)</td></tr>
+<tr><td>signals</td><td><code>/api/recommended/tail</code> 差分 + 期货 <code>/api/futures/state</code></td><td>轮询差分入库;已推飞书的信号天然去重(pushed_signals)</td></tr>
+<tr><td>backtest_*</td><td><code>/api/backtest</code> + 归档 CSV</td><td>手动导入为主(回测低频且重)</td></tr>
+</table>
+<p><b>降级:</b>8787 不可达(常关机场景)→ /api/portfolio 返回缓存数据 + <code>{"stale":true,"last_sync":...}</code>,前台卡片角标显示「离线快照」;恢复后台自动追平。<b>不反向写入缠论任何数据,只读代理。</b></p>
+
+<h2>8. 缓存 · 调度 · 降级</h2>
+<table>
+<tr><th>任务</th><th>频率</th><th>缓存 TTL</th><th>降级</th></tr>
+<tr><td>行情快线(指数+自选)</td><td>3s(仅行情模块装配且窗口可见)</td><td>内存 2s</td><td>腾讯↔新浪双源切换(缠论容灾逻辑复用)</td></tr>
+<tr><td>sysmon(Mole)</td><td>按需请求驱动 + 5s 采样入库</td><td>2.5s(并发合并)</td><td>超时返回上次快照+stale 标记</td></tr>
+<tr><td>持仓同步(chan)</td><td>60s + 14:55 事件</td><td>60s</td><td>读 SQLite 镜像</td></tr>
+<tr><td>资产快照</td><td>每日 14:55</td><td>—</td><td>错过(关机)则下次启动补昨日档(以当日可得的最近收盘价)</td></tr>
+<tr><td>日 K 缓存</td><td>首次请求拉取,此后每日 20:00 增量</td><td>磁盘(klines 表/文件)</td><td>东财 push2→push2delay 双域名(复用)</td></tr>
+<tr><td>sysmon_samples 裁剪</td><td>每日 20:00 保留 24h</td><td>—</td><td>—</td></tr>
+</table>
+
+<h2>9. 存储位置 · 迁移 · 备份</h2>
+<pre>
+~/Library/Application Support/Workbench/
+  workbench.db            <span class="cm"># 主库(WAL:workbench.db-wal/-shm)</span>
+  backups/                <span class="cm"># 每日 20:00 zip 一份,保留 30 份</span>
+  logs/workbench.log      <span class="cm"># 滚动 7 天</span>
+</pre>
+<p><b>迁移:</b><code>PRAGMA user_version</code> 递增;每个版本一个 <code>migrations/NNN_*.sql</code>,启动时按序执行并记入迁移表。<b>语言/装配</b>等设置从 localStorage 首启时一次性搬迁进 settings 表。</p>
+
+<h2>10. 错误模型与日志</h2>
+<pre>
+HTTP 状态码:400 参数错 · 404 无资源 · 409 幂等冲突 · 502 外部源失败(chan/行情/Numbers)
+响应体:{<span class="str">"error"</span>:{<span class="str">"code"</span>:<span class="str">"CHAN_UNREACHABLE"</span>,<span class="str">"message"</span>:<span class="str">"chan-monitor 8787 不可达"</span>,<span class="str">"stale"</span>:true}}
+code 枚举:DB_ERROR / NUMBERS_EXPORT_FAILED / NUMBERS_UNMATCHED_CATEGORIES / CHAN_UNREACHABLE / QUOTE_TIMEOUT / MOLE_TIMEOUT
+</pre>
+<p>日志:结构化单行 JSON(ts/level/module/msg);sync_log 表记录每次外部同步结果,设置页可视化。</p>
+
+<h2>11. 目录结构(仓库规划)</h2>
+<pre>
+personal-workbench/
+  design/               <span class="cm"># 原型(现状,保留作 UI 参考)</span>
+  docs/设计说明书.html    <span class="cm"># 本文档</span>
+  app/                  <span class="cm"># Tauri 2 壳</span>
+    src/                <span class="cm"># React 前台(由原型演进)</span>
+    src-tauri/
+  server/               <span class="cm"># FastAPI 后台</span>
+    main.py  routers/{todo,ledger,market,portfolio,backtest,sysmon,modules,chan}.py
+    services/{quotes,chan_bridge,mole,numbers_import,scheduler}.py
+    db/{schema.py,migrations/}
+  docs/api.html         <span class="cm"># FastAPI 自带 /docs 导出</span>
+</pre>
+
+<h2>12. 实施里程碑</h2>
+<table>
+<tr><th>阶段</th><th>内容</th><th>验收</th></tr>
+<tr><td><b>M1 骨架</b></td><td>FastAPI + SQLite 迁移 + /api/modules + /api/settings + todos 全套;前台 localStorage 搬迁</td><td>原型待办卡接真接口,刷新不丢</td></tr>
+<tr><td><b>M2 账本</b></td><td>ledger 全套接口 + Numbers 导入管线(JXA)</td><td>真实 .numbers 全量导入,类别/预算/交易与 Numbers 汇总页数字一致</td></tr>
+<tr><td><b>M3 行情持仓</b></td><td>quotes 双源快线 + chan 桥 + 资产快照</td><td>行情 3s 刷新;缠论停掉时卡片显示离线快照</td></tr>
+<tr><td><b>M4 回测与监控</b></td><td>backtest 导入/查询 + sysmon 收编</td><td>回测卡读库;Mole 卡与原型行为一致</td></tr>
+<tr><td><b>M5 桌面化</b></td><td>Tauri 壳 + sidecar 拉起后台 + 开机自启 + 打包 dmg</td><td>双击 App 全功能可用, quitting 干净回收</td></tr>
+</table>
+
+<p style="margin-top:36px;color:var(--t3);font-size:12px">个人工作台 · 后台设计说明书 v1.0 · 基于 2026-10-04 对 Numbers 账本、chan-monitor 8787、Mole status-go 的实测盘点编写</p>
+</div></body></html>

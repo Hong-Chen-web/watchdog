@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>看门狗 Watchdog · Mac App 落地方案(Tauri)</title>
+<style>
+:root{color-scheme:dark;--bg:#0a0e1c;--card:rgba(255,255,255,.04);--bd:rgba(255,255,255,.09);--t1:rgba(255,255,255,.93);--t2:rgba(255,255,255,.58);--t3:rgba(255,255,255,.4);--acc:#0a84ff;--up:#ff5a5f;--dn:#30d158;--mono:ui-monospace,Menlo,monospace}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:radial-gradient(1000px 700px at 80% -10%,rgba(56,88,168,.32),transparent 60%),var(--bg);color:var(--t1);font-family:-apple-system,"PingFang SC",sans-serif;line-height:1.75;padding:44px 20px}
+.wrap{max-width:920px;margin:0 auto}
+h1{font-size:27px;letter-spacing:-.01em;margin-bottom:4px}
+.sub{color:var(--t2);font-size:13.5px;margin-bottom:28px;padding-bottom:16px;border-bottom:1px solid var(--bd)}
+h2{font-size:19px;margin:38px 0 12px;padding-left:11px;border-left:3px solid var(--acc)}
+p,li{font-size:14px;color:var(--t2)}
+b{color:var(--t1)}
+code{background:rgba(255,255,255,.07);padding:1px 6px;border-radius:5px;font-family:var(--mono);font-size:12px;color:#9ecbff}
+pre{background:rgba(0,0,0,.35);border:1px solid var(--bd);border-radius:12px;padding:15px 17px;font-size:11.5px;line-height:1.6;overflow-x:auto;color:#c8d6f0;margin:11px 0}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin:10px 0}
+th{text-align:left;color:var(--t3);font-weight:600;padding:6px 9px;border-bottom:1px solid var(--bd);font-size:11px}
+td{padding:7px 9px;border-bottom:1px solid rgba(255,255,255,.05);color:var(--t2);vertical-align:top}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px 20px;margin:12px 0}
+.ok{color:var(--dn)}.mock{color:#ffd60a}.todo{color:var(--t3)}
+.note{font-size:12.5px;background:rgba(255,214,10,.06);border:1px solid rgba(255,214,10,.2);border-radius:10px;padding:10px 14px;margin:11px 0;color:var(--t2)}
+</style>
+</head><body><div class="wrap">
+
+<h1>看门狗 Watchdog · Mac App 落地方案</h1>
+<div class="sub">v1.0 · 2026-10-05 · 承接《后台设计说明书 v1.0》M5 · 当前原型:design/index.html + server(FastAPI 8790)</div>
+
+<h2>1. 定位与现状盘点</h2>
+<p><b>当前一切均为原型阶段</b>(前台单文件 HTML + 本地 FastAPI),但它已经是"半真半模拟"的高保真原型——数据库、接口、交互形态全部按生产设计实现。落地 Mac App 时,<b>后端(含 SQLite schema、全部接口)原样复用</b>,前台从单文件拆为模块化工程,外层加 Tauri 壳。</p>
+<table>
+<tr><th>模块</th><th>数据现状</th><th>落地动作</th></tr>
+<tr><td>待办 / 日志复盘</td><td class="ok">真数据(SQLite)</td><td>原样迁移</td></tr>
+<tr><td>账本 / 预算 / 目标</td><td class="ok">真数据(Numbers 导入 303 笔 + 目标 6 条)</td><td>原样迁移;Numbers 导入做成 App 内按钮</td></tr>
+<tr><td>回测档案</td><td class="ok">真数据(1170 笔 + 93 点月度曲线)</td><td>原样迁移</td></tr>
+<tr><td>自选行情</td><td class="mock">半真:添加/同步时拉一次腾讯快照,<b>无定时轮动</b>;三大指数为静态演示</td><td>补 M3 快线:3s 轮询 + 双源容灾(复用缠论拉数代码)</td></tr>
+<tr><td>持仓 / 资产曲线</td><td class="mock">种子数据(9.23 轮三票 + 20 日曲线)</td><td>chan-monitor 在线时代理覆盖;每日 14:55 资产快照落库</td></tr>
+<tr><td>策略信号 / 期货 / 飞书 / 图表</td><td class="ok">真数据(缠论 8787 只读桥,在线时)</td><td>原样迁移;离线降级提示已有</td></tr>
+<tr><td>系统监控 / 磁盘清理</td><td class="ok">真数据(Mole status-go / analyze-go)</td><td>两个 Go 二进制随 App 打包携带</td></tr>
+</table>
+
+<h2>2. 目标架构</h2>
+<pre>
+┌──────────── Tauri 2 壳(Watchdog.app)────────────┐
+│  Webview(React 前台 app/dist)                    │
+│  Rust:窗口/托盘/开机自启/单实例/sidecar 管理       │
+│         │ spawn/回收                              │
+│  ┌────────────────────────────┐                  │
+│  │ sidecar:watchdog-server     │ FastAPI          │
+│  │ (PyInstaller 单目录打包)    │ 127.0.0.1:8790   │
+│  │ SQLite + 全部 routers       │                  │
+│  └────────────────────────────┘                  │
+│  Resources:Mole status-go / analyze-go、          │
+│            lightweight-charts.js、图标字体        │
+└──────────────────────────────────────────────────┘
+   外部(进程外,不强依赖):chan-monitor 8787、Numbers 文件、腾讯/新浪行情源
+</pre>
+<p><b>关键决策</b>:后端保持独立本地 HTTP 服务(sidecar 化而非塞进 Rust),理由:①接口/数据库零改动,原型验证过的行为直接进生产;②浏览器可调试期长;③chan-monitor、Mole 本来就是进程外形态。App 退出时由 Rust 侧 kill sidecar。</p>
+
+<h2>3. 前台模块化迁移(design/index.html → app/src)</h2>
+<pre>
+app/src/
+  core/            # 从原型抽出的共享层
+    store.js       #   装配/语言/视图(Zustand;localStorage 逻辑原样搬)
+    i18n.js        #   双语字典(原 EN 对象整体迁移)
+    api.js         #   API base(开发 8791 → 生产同源 sidecar)
+    ui/            #   卡片骨架/圆环/弹层/装配目录/五组顶栏(现成组件化)
+  modules/         # ★ 一个模块一个目录,与后端 router 一一对应
+    todo/    {Card.jsx, api.js, i18n.js}
+    ledger/  {Card.jsx, api.js, i18n.js}   # 明细手风琴/筛选/记一笔
+    budget/  …  goals/ … journal/ …        # 预算环/目标三组/复盘三段式
+    market/  …  portfolio/ … backtest/ … feishu/ …  # 含缠论图表弹层
+    sysmon/  …  disk/ …                    # Mole 桥
+  App.jsx          # 组视图路由(SEG_GROUPS 五组配置原样迁移)
+</pre>
+<p>迁移规则:<b>每个模块的 HTML 结构、CSS、加载函数(loadXxx)整块搬进自己的目录</b>,装配注册表 MODULES 由各模块自注册(core/store 汇总)——与后端 MODULE_ROUTERS 对称,真正实现"前后端同拆同装"。</p>
+
+<h2>4. 后端打包与数据迁移</h2>
+<table>
+<tr><th>事项</th><th>方案</th></tr>
+<tr><td>sidecar 打包</td><td><code>pyinstaller --onedir main.py</code>(纯 Python,无 cgo);产物改名 <code>watchdog-server</code> 放 <code>src-tauri/binaries/</code>,tauri.conf externalBin 声明</td></tr>
+<tr><td>Go 依赖</td><td><code>status-go</code>、<code>analyze-go</code> 放 <code>Resources/bin/</code>,路径改为相对 App 资源目录(env <code>WATCHDOG_HOME</code> 注入)</td></tr>
+<tr><td>数据目录</td><td><code>~/Library/Application Support/Watchdog/</code>(workbench.db 迁移脚本:首启检测旧 Workbench 目录则整体拷贝;端口/日志同目录)</td></tr>
+<tr><td>图表静态件</td><td>lightweight-charts.js 入 Resources,chan 路由读资源目录</td></tr>
+<tr><td>缠论依赖</td><td><b>不强绑</b>:chan-monitor 仍独立运行(用户现有开机流程);App 检测 8787 在线则启用桥功能,离线显示降级态</td></tr>
+</table>
+
+<h2>5. Rust 壳要点</h2>
+<ul>
+<li><b>窗口</b>:1200×780 最小 960×600,深色 titlebar(<code>windowEffects: sidebar</code> 毛玻璃),记住位置</li>
+<li><b>托盘</b>:菜单栏狗头图标 → 显示/退出 + 快捷看健康分/今日待办数(v2:HUD 弹窗)</li>
+<li><b>开机自启</b>:tauri-plugin-autostart,设置页开关(settings 表已有键位)</li>
+<li><b>单实例</b>:二次启动唤起已有窗口</li>
+<li><b>sidecar 生命周期</b>:启动等 /api/health 就绪再加载前端;退出 kill;崩溃自动拉起(复用看门狗之名)</li>
+</ul>
+
+<h2>6. 前置条件与风险</h2>
+<div class="note"><b>⚠ 前置</b>:本机 Xcode 许可未同意,当前 brew/python3/cgo 全线受阻——编译 Rust/Tauri 前 must <code>sudo xcodebuild -license accept</code>(需用户亲自执行)。Go 工具链已在 /tmp/go(过期则重新下载 golang.google.cn)。</div>
+<ul>
+<li>无苹果开发者证书 → dmg 先 ad-hoc 签名(本机可用,分发时 Gatekeeper 需右键打开);后续可购证书公证</li>
+<li>PyInstaller 体积 ~40MB + Go 二进制 10MB + 前端 → App 总体 &lt;60MB,可接受</li>
+<li>Python 版本:随 czsc-repo/.venv(3.12)冻结打包;升级走 App 更新通道(v2 updater)</li>
+</ul>
+
+<h2>7. 实施里程碑</h2>
+<table>
+<tr><th>阶段</th><th>内容</th><th>验收</th></tr>
+<tr><td><b>P1 壳跑通</b></td><td>Tauri 脚手架 + sidecar 拉起 + core(store/i18n/api)+ 待办模块迁移</td><td>App 内待办卡读写与原型一致,退出无残留进程</td></tr>
+<tr><td><b>P2 模块迁移</b></td><td>其余 13 模块按 §3 目录逐个搬迁(每日 3-4 个)</td><td>总览/五组视图/装配/双语/图表弹层全量对齐原型</td></tr>
+<tr><td><b>P3 真数据补齐</b></td><td>行情 3s 快线、持仓 chan 代理覆盖、14:55 资产快照、指数真数据</td><td>盘中自选自动跳;缠论重启后持仓自动追平</td></tr>
+<tr><td><b>P4 打包发布</b></td><td>PyInstaller + dmg + 托盘 + 自启 + 数据迁移脚本</td><td>双击 dmg 安装,旧数据无损,开机自启生效</td></tr>
+</table>
+<p style="margin-top:30px;color:var(--t3);font-size:12px">看门狗 Watchdog · Mac App 落地方案 v1.0 · 2026-10-05</p>
+</div></body></html>

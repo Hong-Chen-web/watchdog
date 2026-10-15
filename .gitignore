@@ -1,0 +1,23 @@
+# Build artifacts
+app/appkit/dist/
+app/appkit/.build/
+app/appkit/bin/
+server/build/
+server/dist/
+*.dmg
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# macOS
+.DS_Store
+
+# Runtime data(台账与库不入库,含个人交易记录)
+data/*.json
+server/data/
+data/klines.db
+
+# 交接档案(ZCode 时代项目记忆;含个人账务数据,严禁提交)
+docs/project-memory/
