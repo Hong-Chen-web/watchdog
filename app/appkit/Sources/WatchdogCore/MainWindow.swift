@@ -120,13 +120,22 @@ public func buildMainWindow() -> NSWindow {
         let groupChanged = group != currentGroup
         currentGroup = group
         // 顺序与开关均以后端为准(与 Web 端同源);未认识的 id 由 compactMap 自然过滤
-        let ids = (group == "总览" ? moduleOrder : (groupDefs.first { $0.0 == group }?.1 ?? []))
-            .filter { moduleEnabled[$0] ?? true }
-        for id in ids where cardsById[id] == nil {
-            if let c = makeCard(for: id) { cardsById[id] = c }
-        }
-        content.cards = ids.compactMap { id in
-            cardsById[id].map { ($0, moduleDefs.first { $0.id == id }?.wide ?? false) }
+        var ids: [String] = []
+        if group == "总览" {
+            // 总览 = 三指标方块 + 待办明细(2026-10-16 用户定版:不再铺全部卡片)
+            if cardsById["__overview"] == nil {
+                cardsById["__overview"] = makeOverviewCard(openGroup: { g in show(group: g) })
+            }
+            content.cards = cardsById["__overview"].map { [($0, true)] } ?? []
+        } else {
+            ids = (groupDefs.first { $0.0 == group }?.1 ?? [])
+                .filter { moduleEnabled[$0] ?? true }
+            for id in ids where cardsById[id] == nil {
+                if let c = makeCard(for: id) { cardsById[id] = c }
+            }
+            content.cards = ids.compactMap { id in
+                cardsById[id].map { ($0, moduleDefs.first { $0.id == id }?.wide ?? false) }
+            }
         }
         content.relayout()
         // 数据是异步到的:卡内数据到达后必须重摆,否则 fittingSize 停留在空态
@@ -137,7 +146,7 @@ public func buildMainWindow() -> NSWindow {
         }
         // 子项导航:标明当前组及其成员,点击滚动到对应卡
         groupLabel.stringValue = group == "总览"
-            ? (wdLang == "en" ? "ALL MODULES · \(ids.count)" : "全部模块 · \(ids.count) 张卡")
+            ? (wdLang == "en" ? "TODAY" : "今日 · 支出 / 待办 / 持仓")
             : (wdLang == "en" ? t(group) + " · \(ids.count) modules" : t(group) + "组 · \(ids.count) 个模块")
         subItems.views.forEach { $0.removeFromSuperview() }
         if group != "总览" {
@@ -177,6 +186,10 @@ public func buildMainWindow() -> NSWindow {
     }
     NotificationCenter.default.addObserver(forName: .init("wd.smartRefresh"), object: nil, queue: .main) { _ in
         MainActor.assumeIsolated { rebuildAll() }
+    }
+    // 卡内容异步长高(总览待办明细等)→ 只重摆栅格,不重建卡
+    NotificationCenter.default.addObserver(forName: .init("wd.cardHeightChanged"), object: nil, queue: .main) { _ in
+        MainActor.assumeIsolated { content.relayout() }
     }
 
 
