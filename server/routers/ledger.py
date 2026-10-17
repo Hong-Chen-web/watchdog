@@ -310,17 +310,47 @@ def smart_any(body: dict):
     except Exception:
         pass
 
+    def _resolve_code(name: str) -> str:
+        """腾讯 smartbox:名称 → 6 位代码(绕代理)。"""
+        try:
+            import requests as _rq
+            sess = _rq.Session(); sess.trust_env = False
+            r = sess.get("https://smartbox.gtimg.cn/s3/", params={"v": "2", "q": name, "t": "all"}, timeout=6)
+            r.encoding = "gbk"
+            m = _re.search(r"(\d{6})~", r.text or "")
+            return m.group(1) if m else ""
+        except Exception:
+            return ""
+
     def _llm_parse():
         import json as _json
         import requests
         from datetime import date as _d
         today = _d.today()
+        ctx_wl = ""
+        try:
+            from routers.market import watchlist as _wl
+            rows = [f"{w['code']} {w['name']}" for w in (_wl().get("watchlist") or [])]
+            if rows:
+                ctx_wl = "当前自选清单:" + ";".join(rows) + "。"
+        except Exception:
+            pass
         sys_prompt = (
             f"今天是{today.year}年{today.month}月{today.day}日(星期{'一二三四五六日'[today.weekday()]})。"
             "把用户的话解析成 JSON 数组(可能含多条)。每条字段:"
             '{"type":"ledger|todo|goal","date":"YYYY-MM-DD或null(相对词按今天换算,没提日期用今天)",'
             '"amount":数字或null,"category":"食物/交通/住宿/人情/购物/娱乐/医疗/房屋/投资/其他 之一或null",'
-            '"title":"事项"}。用户说『不用记/别记』的条目直接忽略不要输出。只输出 JSON 数组。')
+            '"title":"事项"}。'
+            "用户也可能下达行情/监控类操作指令,识别为:"
+            '{"type":"watch_add","code":"6位代码或null","name":"股票名或null"} 把某股票加入自选;'
+            '{"type":"watch_del","code":"…","name":"…"} 从自选移除;'
+            '{"type":"stock_level","level":"5m|15m|30m|60m|4h|day"} 切换股票监控级别;'
+            '{"type":"futures_level","level":"1m|5m|15m|30m|60m|4h"} 切换期货监控级别;'
+            '{"type":"selection_run"} 立即跑一次选股;'
+            '{"type":"push_master","on":true或false} 开/关飞书推送总开关。'
+            "操作指令只在用户明确要求改动时输出;自选操作优先用用户给的代码,"
+            "只给名字时从当前自选清单映射 code,清单里没有则 code=null 并填 name。" + ctx_wl +
+            " 用户说『不用记/别记』的条目直接忽略不要输出。只输出 JSON 数组。")
         r = requests.post(
             f"{llm_base.rstrip('/')}/chat/completions",
             headers={"Authorization": f"Bearer {llm_key}"},
@@ -405,7 +435,7 @@ def smart_any(body: dict):
             elif t == "todo":
                 conn.execute(
                     "INSERT INTO todos(title, due_date, priority) VALUES(?,?,3)",
-                    (it.get("title", "")[:200], it.get("date")))
+                    (it.get("title", "")[:200], it.get("date") or it.get("due_date")))
                 conn.commit()
                 results.append(f"待办:{it.get('title')}" + (f"(截止 {it['date']})" if it.get("date") else ""))
             elif t == "goal":
@@ -414,6 +444,61 @@ def smart_any(body: dict):
                     (it.get("scope") or "year", it.get("title", "")))
                 conn.commit()
                 results.append(f"目标:{it.get('title')}")
+            elif t in ("watch_add", "watch_del"):
+                code = _re.sub(r"\D", "", str(it.get("code") or ""))[-6:]
+                nm = str(it.get("name") or "").strip()
+                if not code and nm:
+                    code = _resolve_code(nm)
+                if not code:
+                    results.append(f"自选:没识别到 6 位代码({nm or '未给名称'}),请带代码再说一次")
+                    continue
+                from routers.market import add_watch as _aw, del_watch as _dw, WatchIn as _WI
+                if t == "watch_add":
+                    info = _aw(_WI(code=code))
+                    results.append(f"自选:+{info['code']} {info['name']}")
+                else:
+                    _dw(code)
+                    results.append(f"自选:-{code}")
+            elif t in ("stock_level", "futures_level"):
+                lv = str(it.get("level") or "").strip()
+                if t == "stock_level":
+                    from services import stocks_monitor as _sm
+                    ok = _sm.set_level(lv)
+                    if not ok:
+                        import time as _t3; _t3.sleep(1.0); ok = _sm.set_level(lv)
+                    results.append(f"股票监控级别 → {lv}" if ok else f"股票级别无效:{lv}(可选 5m/15m/30m/60m/4h/day)")
+                else:
+                    from services import futures_monitor as _fm
+                    ok = _fm.set_level(lv)
+                    if not ok:
+                        import time as _t3; _t3.sleep(1.0); ok = _fm.set_level(lv)
+                    results.append(f"期货监控级别 → {lv}" if ok else f"期货级别无效:{lv}(可选 1m/5m/15m/30m/60m/4h)")
+            elif t == "selection_run":
+                from services import selection as _sel
+                started = _sel.run_async()
+                results.append("选股已在后台启动(只算名单,不碰已执行轮)" if started else "选股已在进行中")
+            elif t == "push_master":
+                on = it.get("on", True)
+                on = True if isinstance(on, str) else bool(on)
+                import db as _dbm2
+                import time as _t4
+                for _att in range(2):
+                    try:
+                        c2 = _dbm2.connect()
+                        try:
+                            cur = c2.execute("UPDATE settings SET value=? WHERE key='push_master'", ("on" if on else "off",))
+                            if cur.rowcount == 0:
+                                c2.execute("INSERT INTO settings(key, value) VALUES('push_master', ?)", ("on" if on else "off",))
+                            c2.commit()
+                        finally:
+                            c2.close()
+                        break
+                    except Exception:
+                        if _att == 0:
+                            _t4.sleep(1.0)
+                        else:
+                            raise
+                results.append(f"飞书推送总开关 → {'开' if on else '关'}(off 时只入箱留档)")
     finally:
         conn.close()
     # 识别留痕(以后排查"识别得烂"有据可查)

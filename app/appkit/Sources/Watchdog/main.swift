@@ -74,7 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 try? await Task.sleep(nanoseconds: 500_000_000)
             }
             await MainActor.run {
-                win = buildMainWindow()
+                win = buildWebMainWindow()
                 win?.makeKeyAndOrderFront(nil)
                 NSApp.activate(ignoringOtherApps: true)
                 // 深链:e2e 验收用 `--chart 002975 [名称]` 启动时直接开原生图窗
@@ -90,13 +90,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             await refreshModulesFromServer()   // 顺序/开关与 Web 端同源(后台,不挡开窗)
         }
-        // 主题切换 = 整窗重建(全新窗口+视图树;局部重建会有顽固的层内容残留)
+        // 主题切换:Web 工作台页面内即时换肤(CSS 变量),窗口不再重建
         NotificationCenter.default.addObserver(forName: .init("wd.themeChanged"), object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.win?.close()
-                self?.win = buildMainWindow()
-                self?.win?.makeKeyAndOrderFront(nil)
-                NSApp.activate(ignoringOtherApps: true)
+                let js = "window.wdApplyTheme && window.wdApplyTheme('\(wdThemeID)')"
+                webMainWebView?.evaluateJavaScript(js, completionHandler: nil)
+                if webMainWebView == nil {   // 兜底:主窗口尚未创建(理论上不发生)
+                    self?.win?.close()
+                    self?.win = buildWebMainWindow()
+                    self?.win?.makeKeyAndOrderFront(nil)
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+            }
+        }
+        NotificationCenter.default.addObserver(forName: .init("wd.langChanged"), object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated {
+                let js = "window.wdApplyLang && window.wdApplyLang('\(wdLang)')"
+                webMainWebView?.evaluateJavaScript(js, completionHandler: nil)
             }
         }
         tray = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)

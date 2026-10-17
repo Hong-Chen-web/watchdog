@@ -17,6 +17,7 @@ ensure_light_czsc()   # 必须最先:轻量 czsc 壳顶替 fat 包入口(wbt/pol
 import db as dbm
 from routers.common import http_error
 from routers import modules, todo, ledger, portfolio, backtest, sysmon, market, disk, journal, goals, chan, llm, pushscope
+from routers import ui as webui
 
 # 模块 → router 的装配表(与 module_config 表的 module_id 对应)
 MODULE_ROUTERS = {
@@ -187,6 +188,9 @@ app.add_exception_handler(HTTPException, http_error)
 
 for _name, _router in MODULE_ROUTERS.items():
     app.include_router(_router)
+
+# Web UI(桌面版主界面):不进 MODULE_ROUTERS —— UI 不参与模块装配开关
+app.include_router(webui.router)
 
 
 @app.get("/api/health")

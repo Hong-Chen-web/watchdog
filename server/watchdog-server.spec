@@ -5,7 +5,7 @@ from PyInstaller.utils import hooks as pyi_hooks
 a = Analysis(
     ['main.py'],
     pathex=[],
-    datas=[],
+    datas=[("static/watchdog_ui.html", "static")],
     binaries=pyi_hooks.collect_dynamic_libs('czsc') + pyi_hooks.collect_data_files('czsc'),
     hiddenimports=['email', 'email.parser', 'email.message', 'email.feedparser',
               'email.utils', 'email.mime', 'email.mime.text', 'email.mime.multipart',

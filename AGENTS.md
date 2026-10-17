@@ -6,6 +6,7 @@
 ## 1. 这个项目是什么
 
 macOS 原生量化工作台:**AppKit(Swift)桌面壳 + FastAPI(Python)内置后端 + czsc 缠论引擎**,单 App 全包。
+- 主窗口 = **WKWebView 装载 Web 工作台**(2026-10-17 换版):sidecar 提供静态壳 `/ui`(server/static/watchdog_ui.html,无数据入库)+ 一次性快照 `/api/ui/bootstrap`;写动作直接打各真接口(todos PATCH / 监控级别 PUT / 飞书 test / modules PUT / smart-any)。原生 K 线窗、设置窗经 `window.webkit.messageHandlers.wd` 桥回 App(WebMainWindow.swift 的 WDBridge);`--chart 代码 [名称]`、`--settings` 深链保留。
 - 核心业务:**涨停缩量策略**全自动流水线——每天 14:55 自动结算持仓 + 自动选股,14:57 按收盘价买入前三,飞书推卡(卖出卡/持仓卡/买入卡/选股卡);盘中按监控级别扫缠论买卖点推飞书
 - 仓库:https://github.com/Hong-Chen-web/watchdog (main 分支)
 
@@ -14,10 +15,13 @@ macOS 原生量化工作台:**AppKit(Swift)桌面壳 + FastAPI(Python)内置后�
 ```
 app/appkit/           Swift 壳(WatchdogCore 库 + Watchdog 可执行)
   Sources/WatchdogCore/   卡片(Cards*.swift)/原生K线图(ChartWindow.swift)/设置/主题
+  Sources/WatchdogCore/WebMainWindow.swift  ★主窗口=WKWebView+wd桥(K线/设置回原生);旧原生主界面 MainWindow.swift 保留(测试/回退)
   bundle_app.sh           打 .app(含 frozen 后端)+ dmg
   dist/Watchdog.app       用户实际运行的 App(launchd 守护指向这里)
 server/               FastAPI 后端
   main.py                 入口(8790 端口;启动:轻量czsc壳→迁移→调度器→各监控线程)
+  static/watchdog_ui.html ★桌面版主界面(WKWebView 装载;无数据,运行时拉接口)
+  routers/ui.py           ★Web UI:/ui 页面 + /api/ui/bootstrap 快照 + /api/ui/push-master
   routers/                chan(缠论/选股/飞书卡API)/market/portfolio/ledger/todo/pushscope...
   services/
     selection.py          ★选股+结算引擎(六条件/六因子/滚动集/卖出规则)
@@ -27,7 +31,7 @@ server/               FastAPI 后端
     feishu_push.py        ★飞书事务性发件箱(重试/幂等/多机器人定向)
     chan_backtest_mirror.py  实盘台账镜像(轮档案→SQLite,持仓/盈亏/资产曲线)
   migrations/NNN_*.sql    数据库迁移(PRAGMA user_version 顺序执行,当前 v21)
-  watchdog-server.spec    PyInstaller frozen 打包配置
+  watchdog-server.spec    PyInstaller frozen 打包配置(含 static 数据)
 data/                 运行数据(gitignore):klines.db/轮档案/冷却簿/行业图/信号滚动集
 ~/Library/Application Support/Workbench/workbench.db   主数据库(设置/自选/信号/台账)
 ```
@@ -47,13 +51,14 @@ data/                 运行数据(gitignore):klines.db/轮档案/冷却簿/行�
 
 ```bash
 # ① 后端改动 → 不需要冻结包也行:App 优先用 venv 源码
-# ② 改完后重启应用让 sidecar 重新加载:
+# ② Web UI 改动(server/static/watchdog_ui.html)→ 同样只需重启 App:
 #    守护循环:app 死掉 ~15s 自动拉起
-pkill -x Watchdog        # 守护自动重启 App→新 sidecar(源码)
-# ③ 如需更新分发版本(GitHub Release/dmg):
-cd app/appkit && swift build -c release && ./bundle_app.sh
-#    注意:bundle 前先 launchctl unload ~/Library/LaunchAgents/com.chenhong.watchdog.plist
-#    防止换包时守护把半成品拉起来;换完 open dist/Watchdog.app 再 load 回去
+pkill -x Watchdog        # 守护自动重启 App→新 sidecar;WebView 重载 /ui
+# ③ Swift 壳改动(如 WebMainWindow)→ 需要换包,流程:
+#    launchctl unload ~/Library/LaunchAgents/com.chenhong.watchdog.plist
+#    pkill -x Watchdog
+#    cd app/appkit && swift build -c release && ./bundle_app.sh
+#    open dist/Watchdog.app && launchctl load ~/Library/LaunchAgents/com.chenhong.watchdog.plist
 # ④ 重打 frozen:cd server && /Users/chenhong/github/czsc-repo/.venv/bin/pyinstaller watchdog-server.spec --noconfirm
 ```
 
@@ -86,6 +91,7 @@ cd app/appkit && swift build -c release && ./bundle_app.sh
 - Swift 侧:全量 `swift test`(仓库已有大量回归:逻辑/离屏渲染/像素断言)。
   **离屏渲染**:`bitmapImageRepForCachingDisplay(in:)+cacheDisplay`→PNG 落 /tmp 目测——锁屏可跑
 - 后端:直接用 venv python 调函数冒烟 + `curl` 真接口;数据类改动必须**用当日真实数据核对**(用户会拿规则逐条对)
+- Web UI(主界面):浏览器直接开 `http://127.0.0.1:8790/ui` 即可测全部交互(与 App 内同一页面);写动作会真落库,测试数据用完删(参考 /api/todos POST+DELETE、/api/ledger/entries DELETE)。无头截图加 `--run-all-compositor-stages-before-draw`,否则 .page 入场动画会冻在半程拍出"半透明"
 - UI 改动:AX 真实点击(AXPressAction)+ 必要时截图;改完的界面要跟用户确认观感
 
 ## 8. 用户协作偏好(重要程度不亚于代码)

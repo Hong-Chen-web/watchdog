@@ -1,24 +1,37 @@
 # 看门狗 Watchdog 🐕
 
-**macOS 原生量化交易工作台** —— 涨停缩量策略全自动选股/结算 + 缠论信号监控 + 实盘台账 + 个人账本,一个 App 全包。
+**macOS 量化交易工作台** —— 涨停缩量策略全自动选股/结算 + 缠论信号监控 + 实盘台账 + 个人账本,一个 App 全包。
 
-![macOS 13+](https://img.shields.io/badge/macOS-13%2B-blue) ![Swift](https://img.shields.io/badge/UI-AppKit-orange) ![Python](https://img.shields.io/badge/后端-FastAPI-green) ![ stars](https://img.shields.io/badge/实盘运行中-每天14:55自动选股-ff69b4)
+![macOS 13+](https://img.shields.io/badge/macOS-13%2B-blue) ![UI](https://img.shields.io/badge/UI-WKWebView%2BAppKit-orange) ![Python](https://img.shields.io/badge/后端-FastAPI-green) ![stars](https://img.shields.io/badge/实盘运行中-每天14:55自动选股-ff69b4)
 
 ## 为什么做这个
 
-市面上量化工具要么是纯回测脚本、要么是 Web 面板,没有一个是"**盘后自动跑完整流水线、开 App 就能看**"的桌面端。看门狗把一整套涨停缩量策略搬进了 macOS 原生 App:
+市面上量化工具要么是纯回测脚本、要么是网页面板,没有一个是"**盘后自动跑完整流水线、开 App 就能看**"的桌面端。看门狗把一整套涨停缩量策略搬进了 macOS App:
 
 - **14:55 自动结算**持仓(跌停跑 > 炸板3次走 > 涨停续命 > 满3交易日尾盘走)
-- **14:55 自动选股**(六条件打分,候选来自近10日涨停滚动池,全流程约 1 分钟)
+- **14:55 自动选股**(六条件打分,候选来自近10日涨停滚动池+冷却簿,全流程约 1 分钟)
 - **14:57 买入**评分前三、各 1/3 仓,买价锁定,持仓上限 3 只
-- **飞书卡片**推送:卖出卡(带红绿盈亏)/ 持仓卡 / 买入卡 / 选股卡,盘中缠论买卖点一票一卡
+- **飞书卡片**推送:卖出卡(带红绿盈亏)/ 持仓卡 / 买入卡 / 选股卡;盘中缠论买卖点一票一卡,事务性发件箱保证重试与幂等
 
 ## 界面预览
 
-| 原生缠论图表(K线+笔+中枢+买卖点) | 自选行情 + 策略信号(今日真实选股) |
-|---|---|
+> 截图均为**合成演示数据**,仓库不含任何真实交易信息。
 
-| 设置(行式布局,参考 macOS 原生偏好) |
+| 今日 · 深色 | 交易 · 深色 |
+|---|---|
+| ![今日](docs/img/ui-today.png) | ![交易](docs/img/ui-trade.png) |
+
+| 金钱 · 浅色 | 英文界面 · 浅色 |
+|---|---|
+| ![金钱](docs/img/ui-money.png) | ![English](docs/img/ui-en.png) |
+
+| AI 记录 / 问答(自然语言) | 系统 · 主机与数据源健康 |
+|---|---|
+| ![AI](docs/img/ui-ai.png) | ![系统](docs/img/ui-sys.png) |
+
+原生缠论图表(K线 + 笔 + 中枢 + 买卖点)由 AppKit 绘制,Web 表格点行直达:
+
+| 偏好设置(主题 / 语言 / 大模型 / 飞书机器人) |
 |---|
 | ![设置](docs/screenshot-settings.png) |
 
@@ -40,16 +53,18 @@
 
 | 模块 | 说明 |
 |---|---|
-| **持仓概览** | 策略台账镜像:真实持仓/股数/资产曲线悬停查每日/买卖明细/口径校准 |
-| **策略回测** | 本金/已实现/胜轮/最差轮 + 逐轮资产曲线(日/月/年切换) |
-| **策略信号** | 内置选股引擎,14:55 自动跑;也可点「⚡策略信号」立即执行 |
+| **今日总览** | 资产/盈亏/待办/月支出四卡 + 30 日资产曲线 + 持仓 + 当日时间轴,一屏看完 |
+| **交易** | 持仓 / 自选行情(3s 快线)/ 期货监控表 / 最近一轮选股 / 候选池·冷却簿 / 飞书推送 |
+| **金钱** | 账本 · 预算 · 月度趋势;自然语言记账,后端大模型解析直接落库 |
+| **时间** | 待办 · 日志 / 复盘 |
+| **系统** | 主机健康 / 数据源健康 / 模块装配 / 磁盘与产物 / 服务 |
+| **AI 记录与问答** | 一句话:记账、待办、目标;也能下真实指令(加/移自选、切监控级别、跑选股、开关推送,真实落库)——问题走只读查询 |
 | **缠论图表** | 原生 AppKit 绘制:K线+笔+中枢+B1/B2/B3·S1/S2/S3 买卖点,毫秒级开窗 |
-| **自选行情** | 3s 快线(腾讯源),按涨跌幅排序,行内增删 |
-| **期货监控** | 7 品种 + czsc 实时结构(笔/中枢/方向),盘中 30s 重算 |
-| **收支账本** | 自然语言记账(「昨天午饭花了35」自动归类)+ 预算/目标/年度财务分析 |
-| **系统与磁盘** | CPU/内存/GPU 六环 + 磁盘清理 |
+| **策略引擎** | 14:55 自动结算 + 选股;六条件硬门槛 → 六因子排序;候选 = 涨停滚动集 − 持仓 − 冷却 |
+| **飞书推送** | 事务性发件箱:重试 / 幂等 / 多机器人 / 多票池定向;App 内可视化卡面与逐目标投递 |
+| **行情数据** | 腾讯优先(清单/K线/快照),新浪行业分类,东财仅剩主力净占比(每票每涨停日永久缓存);全 SQLite 本地 |
 
-深色/浅色主题 · 中英双语 · 全数据 SQLite 持久化(断网可用) · 飞书机器人推送可配多票池。
+深色/浅色即时切换 · 中英双语 · 全卡片折叠(状态记忆) · 一键脱敏 · 单 App 全包(内置后端)。
 
 ## 快速开始
 
@@ -59,22 +74,38 @@
 
 # 2. 源码运行
 git clone https://github.com/Hong-Chen-web/watchdog.git
-cd watchdog/app/appkit
-swift test && swift build -c release && ./bundle_app.sh
+cd watchdog
+
+# 后端(Python 3.11+;依赖 fastapi / uvicorn / requests / czsc 等)
+cd server && python main.py            # http://127.0.0.1:8790
+
+# 桌面壳(另开终端)
+cd app/appkit
+swift test                             # 全量回归(逻辑 / 离屏渲染 / 像素断言)
+swift build -c release && ./bundle_app.sh
 open dist/Watchdog.app
 ```
 
 ## 架构
 
 ```
-Watchdog.app (AppKit 原生壳)
-├─ WatchdogCore      界面:卡片栅格/原生K线图/设置(纯 AppKit,无 WebView)
-└─ watchdog-server   FastAPI + czsc(缠论)+ 腾讯/新浪行情源 + SQLite
-                     ├── selection.py   选股引擎(滚动池+六条件+六因子)
-                     ├── kline_store.py K线底库(SQLite,全A日K)
-                     ├── feishu_push.py 事务性发件箱(重试/幂等/多机器人定向)
-                     └── chan_backtest_mirror.py  实盘台账镜像
+Watchdog.app (AppKit 壳)
+├─ 主窗口 WKWebView ── 本地 Web 工作台(server/static/watchdog_ui.html,单文件零 CDN)
+│    ↕ JS 桥(window.wd):原生 K 线窗 / 设置窗 / 主题·语言联动
+├─ WatchdogCore        原生组件:K线绘图 / 设置 / 主题
+└─ watchdog-server     FastAPI + czsc(缠论)+ 腾讯/新浪行情源 + SQLite
+     ├── routers/ui.py             Web 工作台快照 + AI 问答引擎
+     ├── selection.py              选股引擎(滚动池 + 六条件 + 六因子)
+     ├── kline_store.py            K 线底库(SQLite,全 A 日 K)
+     ├── feishu_push.py            事务性发件箱(重试/幂等/多机器人定向)
+     └── chan_backtest_mirror.py   实盘台账镜像(资产曲线 / 持仓 / 盈亏)
 ```
+
+## 隐私
+
+- 所有个人数据(持仓 / 资产 / 账本 / 待办 / 自选 / 飞书 webhook)只存本机 SQLite,**永不进仓库**
+- 仓库内的截图、测试夹具均为**合成演示数据**
+- AI 功能需在「设置 → 大模型」自配 API Key,仅存本机
 
 ## 免责声明
 
