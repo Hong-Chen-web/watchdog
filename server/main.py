@@ -16,7 +16,7 @@ ensure_light_czsc()   # 必须最先:轻量 czsc 壳顶替 fat 包入口(wbt/pol
 
 import db as dbm
 from routers.common import http_error
-from routers import modules, todo, ledger, portfolio, backtest, sysmon, market, disk, journal, goals, chan, llm, pushscope
+from routers import modules, todo, ledger, portfolio, backtest, sysmon, market, disk, journal, goals, chan, feishu, llm, pushscope
 from routers import ui as webui
 
 # 模块 → router 的装配表(与 module_config 表的 module_id 对应)
@@ -64,7 +64,7 @@ async def lifespan(app: FastAPI):
     _th.Thread(target=_initial_mirror, daemon=True).start()
     conn = dbm.connect()
     ver = dbm.migrate(conn)
-    from routers.chan import ensure_feishu_from_json
+    from routers.feishu import ensure_feishu_from_json
     ensure_feishu_from_json(conn)   # 首启:飞书配置从缠论 json 灌入表
     conn.close()
     # 行情快线(3s 腾讯批量:自选+指数)
@@ -188,6 +188,9 @@ app.add_exception_handler(HTTPException, http_error)
 
 for _name, _router in MODULE_ROUTERS.items():
     app.include_router(_router)
+
+# chan 域拆分:飞书通道配置(路径仍 /api/chan/feishu*,不单独成模块)
+app.include_router(feishu.router)
 
 # Web UI(桌面版主界面):不进 MODULE_ROUTERS —— UI 不参与模块装配开关
 app.include_router(webui.router)

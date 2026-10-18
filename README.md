@@ -90,11 +90,12 @@ open dist/Watchdog.app
 
 ```
 Watchdog.app (AppKit 壳)
-├─ 主窗口 WKWebView ── 本地 Web 工作台(server/static/watchdog_ui.html,单文件零 CDN)
+├─ 主窗口 WKWebView ── 本地 Web 工作台(server/static/,零构建零 CDN)
 │    ↕ JS 桥(window.wd):原生 K 线窗 / 设置窗 / 主题·语言联动
-├─ WatchdogCore        原生组件:K线绘图 / 设置 / 主题
+├─ WatchdogCore        原生组件:K线绘图 / 设置 / 主题(旧原生仪表盘已归档 Legacy/,壳不再调用)
 └─ watchdog-server     FastAPI + czsc(缠论)+ 腾讯/新浪行情源 + SQLite
      ├── routers/ui.py             Web 工作台快照 + AI 问答引擎
+     ├── routers/chan·feishu.py    缠论信号/选股 与 飞书通道配置
      ├── selection.py              选股引擎(滚动池 + 六条件 + 六因子)
      ├── kline_store.py            K 线底库(SQLite,全 A 日 K)
      ├── feishu_push.py            事务性发件箱(重试/幂等/多机器人定向)

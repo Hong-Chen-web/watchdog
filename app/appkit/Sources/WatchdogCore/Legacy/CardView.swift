@@ -1,3 +1,5 @@
+// [LEGACY] 旧原生仪表盘(App 壳已停用;保留供回退参考与渲染测试)。见 AGENTS.md §2 结构说明。
+
 import AppKit
 
 // MARK: - 卡片容器(radius 18 + 蓝调渐变面 + 描边,对齐 .card)+ 编辑布局移除按钮

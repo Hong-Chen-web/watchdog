@@ -1,0 +1,36 @@
+/* 看门狗 Web 工作台 · 设计变量与基础样式(由单文件版机械拆分,按序引入) */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  /* 文字三级 */
+  --ink:#0A1A38;            /* 标题 / 指标数字 / 主按钮 */
+  --body:#44506A;           /* 正文 / 表格主体 */
+  --mut:#9AA6B8;            /* 标签 / 说明 / 表头 */
+  /* 品牌强调(仅小面积):品牌标志 / 指标小图标 / 风险条 / AI 标签 */
+  --acc:#DF4B80;
+  --acc-soft:rgba(223,75,128,.12);
+  /* 涨跌语义(红涨绿跌,低饱和融入冷调) */
+  --up:#D93F3F; --dn:#1E9B67;
+  /* 面 */
+  --bg:#E2E6EA; --rail:#CADAE8; --card:#EDF1F4; --float:#FFFFFF;
+  /* 数据可视化蓝 */
+  --viz-fill:#A5CFF5; --viz-ring:#C9E0F5; --viz-line:#7ABBF6;
+  --viz-hi:#65B2F6; --viz-hi2:#3C96E6; --viz-mut:#B4D8F4; --viz-mut2:#8FA3BD;
+  /* 发丝线 / 阴影 */
+  --hair:rgba(10,26,56,.06); --hair2:rgba(10,26,56,.045);
+  --shadow:0 26px 60px -40px rgba(10,26,56,.34);
+  --shadow-soft:0 18px 46px -34px rgba(10,26,56,.26);
+}
+html{font-size:15px}
+body{font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif;color:var(--body);
+  min-height:100vh;display:flex;gap:0;
+  background:
+    radial-gradient(1200px 760px at 94% -12%, rgba(169,200,231,.95) 0%, rgba(169,200,231,.42) 40%, rgba(169,200,231,0) 68%),
+    radial-gradient(1500px 900px at 26% 114%, rgba(213,225,236,.9) 0%, rgba(213,225,236,0) 62%),
+    linear-gradient(205deg, rgba(201,224,245,.32) 0%, rgba(226,230,234,0) 52%),
+    var(--bg);
+  background-attachment:fixed}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input{font:inherit;color:inherit}
+.num,.up,.dn,table td{font-variant-numeric:tabular-nums}
+.up{color:var(--up)}.dn{color:var(--dn)}

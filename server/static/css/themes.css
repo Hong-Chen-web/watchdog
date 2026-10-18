@@ -1,0 +1,52 @@
+/* 看门狗 Web 工作台 · 主题:深色(data-theme="dark")覆盖,最后引入 */
+/* ---------- 深色主题(data-theme="dark";冷调深蓝,与浅色同一体系) ---------- */
+html[data-theme="dark"]{
+  --ink:#E8EDF6; --body:#AEB9CC; --mut:#75808F;
+  --acc:#E05590; --acc-soft:rgba(224,85,144,.18);
+  --up:#E56560; --dn:#33C08A;
+  --bg:#0F131A; --rail:#141A23; --card:#1A222E; --float:#212B3A;
+  --viz-fill:#2E4E70; --viz-ring:#26364A; --viz-line:#5A9BD8;
+  --viz-hi:#65B2F6; --viz-hi2:#7FC0FF; --viz-mut:#33506E; --viz-mut2:#68788E;
+  --hair:rgba(255,255,255,.07); --hair2:rgba(255,255,255,.045);
+  --shadow:0 26px 60px -40px rgba(0,0,0,.75); --shadow-soft:0 18px 46px -34px rgba(0,0,0,.65);
+}
+html[data-theme="dark"] body{background:
+  radial-gradient(1200px 760px at 94% -12%, rgba(38,58,88,.55) 0%, rgba(38,58,88,.22) 40%, rgba(38,58,88,0) 68%),
+  radial-gradient(1500px 900px at 26% 114%, rgba(30,42,60,.5) 0%, rgba(30,42,60,0) 62%),
+  linear-gradient(205deg, rgba(38,64,96,.25) 0%, rgba(15,19,26,0) 52%),
+  var(--bg);
+  background-attachment:fixed}
+html[data-theme="dark"] .rail{background:rgba(20,26,35,.92);border-right:1px solid rgba(255,255,255,.06)}
+html[data-theme="dark"] .card{border-color:rgba(255,255,255,.06)}
+html[data-theme="dark"] .promo{border-color:rgba(255,255,255,.08)}
+html[data-theme="dark"] .pill{background:rgba(255,255,255,.05);box-shadow:0 18px 40px -30px rgba(0,0,0,.6)}
+html[data-theme="dark"] .pill:hover{box-shadow:0 28px 54px -30px rgba(0,0,0,.75)}
+html[data-theme="dark"] .seg{background:rgba(255,255,255,.06)}
+html[data-theme="dark"] .seg .on{background:rgba(255,255,255,.14);color:var(--ink);box-shadow:none}
+html[data-theme="dark"] .btn{background:var(--ink);color:#0F131A;box-shadow:0 14px 30px -18px rgba(0,0,0,.7)}
+html[data-theme="dark"] .btn.ghost{background:rgba(255,255,255,.06);color:var(--ink);border:1px solid rgba(255,255,255,.09);box-shadow:none}
+html[data-theme="dark"] .lv{background:rgba(255,255,255,.07);color:var(--body)}
+html[data-theme="dark"] .lv.on{background:var(--ink);color:#0F131A}
+html[data-theme="dark"] .chip{background:rgba(255,255,255,.07)}
+html[data-theme="dark"] .chipf{background:rgba(255,255,255,.06);color:var(--body);border-color:rgba(255,255,255,.07)}
+html[data-theme="dark"] .chipf.on{background:var(--ink);color:#0F131A}
+html[data-theme="dark"] .iconbtn{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.1)}
+html[data-theme="dark"] .cal-day.sel{background:var(--ink);color:#0F131A}
+html[data-theme="dark"] .cal-day.sel .d i{background:var(--bg) !important}
+html[data-theme="dark"] .row-hover:hover,html[data-theme="dark"] .push-row:hover,
+html[data-theme="dark"] .td-row:hover,html[data-theme="dark"] .cal-day:hover{background:rgba(101,178,246,.10)}
+html[data-theme="dark"] .srch{background:rgba(101,178,246,.10);border-color:rgba(101,178,246,.30)}
+html[data-theme="dark"] .addbox input{background:rgba(101,178,246,.10);border-color:rgba(101,178,246,.30)}
+html[data-theme="dark"] .tip{background:#1E2734;border-color:rgba(255,255,255,.08)}
+html[data-theme="dark"] .toast{background:#212B3A;box-shadow:0 26px 56px -24px rgba(0,0,0,.7)}
+html[data-theme="dark"] .dd-menu{background:#1E2734;border:1px solid rgba(255,255,255,.08)}
+html[data-theme="dark"] .dd-item:hover{background:rgba(255,255,255,.05)}
+html[data-theme="dark"] .fcard{background:#1E2734}
+html[data-theme="dark"] .chcard{background:rgba(255,255,255,.05);box-shadow:none}
+html[data-theme="dark"] .ai-pill{background:#1B2430}
+html[data-theme="dark"] .ai-card{background:#1B2430}
+html[data-theme="dark"] .ai-res{background:#1E2734;border-color:rgba(255,255,255,.07)}
+html[data-theme="dark"] .ai-close{background:rgba(255,255,255,.07)}
+html[data-theme="dark"] .ai-close:hover{background:rgba(255,255,255,.12)}
+html[data-theme="dark"] .dw-close:hover{background:rgba(255,255,255,.10)}
+html[data-theme="dark"] .dw-kv span,html[data-theme="dark"] .kvrow span{color:var(--mut)}

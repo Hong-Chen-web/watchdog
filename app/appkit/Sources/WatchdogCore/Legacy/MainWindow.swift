@@ -1,3 +1,5 @@
+// [LEGACY] 旧原生仪表盘(App 壳已停用;保留供回退参考与渲染测试)。见 AGENTS.md §2 结构说明。
+
 import AppKit
 
 // MARK: - 主窗口:dense 网格内容区 + 毛玻璃侧栏 + 46px 顶栏

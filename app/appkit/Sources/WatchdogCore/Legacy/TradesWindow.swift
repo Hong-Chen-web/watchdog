@@ -1,3 +1,5 @@
+// [LEGACY] 旧原生仪表盘(App 壳已停用;保留供回退参考与渲染测试)。见 AGENTS.md §2 结构说明。
+
 import AppKit
 
 // MARK: - 买卖明细窗口(全部实盘交易,滚动表格)
@@ -94,8 +96,4 @@ public func openTradesWindow() {
             tradesWindowRef = win
         }
     }
-}
-
-extension NSBox {
-    func also(_ configure: (NSBox) -> Void) -> NSBox { configure(self); return self }
 }

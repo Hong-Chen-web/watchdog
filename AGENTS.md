@@ -6,7 +6,7 @@
 ## 1. 这个项目是什么
 
 macOS 原生量化工作台:**AppKit(Swift)桌面壳 + FastAPI(Python)内置后端 + czsc 缠论引擎**,单 App 全包。
-- 主窗口 = **WKWebView 装载 Web 工作台**(2026-10-17 换版):sidecar 提供静态壳 `/ui`(server/static/watchdog_ui.html,无数据入库)+ 一次性快照 `/api/ui/bootstrap`;写动作直接打各真接口(todos PATCH / 监控级别 PUT / 飞书 test / modules PUT / smart-any)。原生 K 线窗、设置窗经 `window.webkit.messageHandlers.wd` 桥回 App(WebMainWindow.swift 的 WDBridge);`--chart 代码 [名称]`、`--settings` 深链保留。
+- 主窗口 = **WKWebView 装载 Web 工作台**(2026-10-17 换版):sidecar 提供静态壳 `/ui`(server/static/index.html + css/ + js/,经 `/ui-assets/*` 下发;无数据入库)+ 一次性快照 `/api/ui/bootstrap`;写动作直接打各真接口(todos PATCH / 监控级别 PUT / 飞书 test / modules PUT / smart-any)。原生 K 线窗、设置窗经 `window.webkit.messageHandlers.wd` 桥回 App(WebMainWindow.swift 的 WDBridge);`--chart 代码 [名称]`、`--settings` 深链保留。
 - 核心业务:**涨停缩量策略**全自动流水线——每天 14:55 自动结算持仓 + 自动选股,14:57 按收盘价买入前三,飞书推卡(卖出卡/持仓卡/买入卡/选股卡);盘中按监控级别扫缠论买卖点推飞书
 - 仓库:https://github.com/Hong-Chen-web/watchdog (main 分支)
 
@@ -14,15 +14,15 @@ macOS 原生量化工作台:**AppKit(Swift)桌面壳 + FastAPI(Python)内置后�
 
 ```
 app/appkit/           Swift 壳(WatchdogCore 库 + Watchdog 可执行)
-  Sources/WatchdogCore/   卡片(Cards*.swift)/原生K线图(ChartWindow.swift)/设置/主题
-  Sources/WatchdogCore/WebMainWindow.swift  ★主窗口=WKWebView+wd桥(K线/设置回原生);旧原生主界面 MainWindow.swift 保留(测试/回退)
+  Sources/WatchdogCore/   ★主窗口=WebMainWindow(WKWebView+wd桥,K线/设置回原生);活件:ChartWindow(原生K线图)/SettingsWindow/Theme/Components(共享控件)/Models/APIClient/ModuleState/Lifecycle/ChanCode
+  Sources/WatchdogCore/Legacy/  旧原生仪表盘(MainWindow/Cards*/OverviewPane/CardView/TradesWindow/Dialogs/ComponentsLegacy)——App 壳不再调用,保留供回退参考与渲染测试(swift test 仍全量编译)
   bundle_app.sh           打 .app(含 frozen 后端)+ dmg
   dist/Watchdog.app       用户实际运行的 App(launchd 守护指向这里)
 server/               FastAPI 后端
   main.py                 入口(8790 端口;启动:轻量czsc壳→迁移→调度器→各监控线程)
-  static/watchdog_ui.html ★桌面版主界面(WKWebView 装载;无数据,运行时拉接口)
+  static/ ★桌面版主界面(WKWebView 装载;index.html + css/4个 + js/11个,业务在 services/ui_snapshot.py 与 services/ai_query.py)
   routers/ui.py           ★Web UI:/ui 页面 + /api/ui/bootstrap 快照 + /api/ui/push-master
-  routers/                chan(缠论/选股/飞书卡API)/market/portfolio/ledger/todo/pushscope...
+  routers/                chan(缠论/选股/信号/图表)/feishu(通道配置CRUD,路径仍 /api/chan/feishu*)/market/portfolio/ledger/todo/pushscope...
   services/
     selection.py          ★选股+结算引擎(六条件/六因子/滚动集/卖出规则)
     kline_store.py        ★K线底库(SQLite data/klines.db)+当日快照合成+4h合成
@@ -30,7 +30,7 @@ server/               FastAPI 后端
     futures_monitor.py    ★期货信号监控(级别可配,settings键 futures_monitor_level)
     feishu_push.py        ★飞书事务性发件箱(重试/幂等/多机器人定向)
     chan_backtest_mirror.py  实盘台账镜像(轮档案→SQLite,持仓/盈亏/资产曲线)
-  migrations/NNN_*.sql    数据库迁移(PRAGMA user_version 顺序执行,当前 v21)
+  migrations/NNN_*.sql    数据库迁移(PRAGMA user_version 顺序执行,当前 v23)
   watchdog-server.spec    PyInstaller frozen 打包配置(含 static 数据)
 data/                 运行数据(gitignore):klines.db/轮档案/冷却簿/行业图/信号滚动集
 ~/Library/Application Support/Workbench/workbench.db   主数据库(设置/自选/信号/台账)
@@ -51,7 +51,7 @@ data/                 运行数据(gitignore):klines.db/轮档案/冷却簿/行�
 
 ```bash
 # ① 后端改动 → 不需要冻结包也行:App 优先用 venv 源码
-# ② Web UI 改动(server/static/watchdog_ui.html)→ 同样只需重启 App:
+# ② Web UI 改动(server/static/ 下 index.html/css/js)→ 同样只需重启 App:
 #    守护循环:app 死掉 ~15s 自动拉起
 pkill -x Watchdog        # 守护自动重启 App→新 sidecar;WebView 重载 /ui
 # ③ Swift 壳改动(如 WebMainWindow)→ 需要换包,流程:
