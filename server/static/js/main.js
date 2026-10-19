@@ -14,6 +14,7 @@ document.addEventListener('click', ev=>{
   else if (a==='cal'){ S.calSel = el.dataset.date; renderCal(); }
   else if (a==='seg'){ S.tradeSeg = el.dataset.v; renderTrade(); }
   else if (a==='open-hold') openHold(el.dataset.code);
+  else if (a==='open-trades'){ S.tradeSeg = 'trades'; renderTrade(); navigate('trade'); }
   else if (a==='open-watch') openWatch(el.dataset.code);
   else if (a==='open-tl') openTl(el.dataset.k);
   else if (a==='open-todo') openTodo(+el.dataset.id);
@@ -132,6 +133,9 @@ function boot(){
   /* 支持 ?page=trade|money|time|sys 直达(用于无头截图验收) */
   const _pp = new URLSearchParams(location.search).get('page');
   if (_pp && PAGE_META[_pp]) navigate(_pp);
+  /* ?seg=hold|watch|trades 直达交易页分段(同用于验收) */
+  const _sg = new URLSearchParams(location.search).get('seg');
+  if (['hold','watch','trades'].includes(_sg)){ S.tradeSeg = _sg; navigate('trade'); renderTrade(); }
 }
 setInterval(fetchFutures, 5000);
 fetch('/api/ui/bootstrap').then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })

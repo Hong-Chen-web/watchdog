@@ -1,9 +1,10 @@
 /* 看门狗 Web 工作台 · 交易页:持仓/自选/选股 + 候选池·冷却簿 + 期货监控 */
 /* ---------- 交易页 ---------- */
-function segCount(){ return ['持仓 · '+D.portfolio.holdings.length, '自选 · '+D.watch.length]; }
+function segCount(){ return ['持仓 · '+D.portfolio.holdings.length, '自选 · '+D.watch.length, '买卖明细 · '+(D.trades||[]).length]; }
 function renderTrade(){
   $('#tradeSeg').innerHTML = '<span data-act="seg" data-v="hold" class="'+(S.tradeSeg==='hold'?'on':'')+'">'+segCount()[0]+'</span>'
-    + '<span data-act="seg" data-v="watch" class="'+(S.tradeSeg==='watch'?'on':'')+'">'+segCount()[1]+'</span>';
+    + '<span data-act="seg" data-v="watch" class="'+(S.tradeSeg==='watch'?'on':'')+'">'+segCount()[1]+'</span>'
+    + '<span data-act="seg" data-v="trades" class="'+(S.tradeSeg==='trades'?'on':'')+'">'+segCount()[2]+'</span>';
   const idx = D.quotes.indices;
   $('#idxPills').innerHTML = Object.entries(idx).map(([n,v],i)=>{
     return '<div class="pill"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 15l5-5 3.5 3.5L19 7"/></svg></div>'
@@ -21,7 +22,7 @@ function renderTrade(){
         +'<td><span class="tagsm">第'+tradeDaysSince(h.buy_date)+'日</span></td></tr>').join('')
       + '</tbody></table>';
     $('#tradeNote').textContent = '持仓上限 3 只 · 可买数 = 3 − 持仓数 · 点击行看卖出评估与规则。';
-  } else {
+  } else if (S.tradeSeg==='watch'){
     const q = S.watchQ.trim().toLowerCase();
     const rows = D.watch.filter(w=>!q || w.code.includes(q) || w.name.toLowerCase().includes(q));
     $('#tradeBody').innerHTML = '<table><thead><tr><th>股票</th><th class="num">现价</th><th class="num">涨跌</th><th class="num">行情时间</th><th></th></tr></thead><tbody>'
@@ -33,6 +34,28 @@ function renderTrade(){
         : '<tr><td colspan="5" style="color:var(--mut)">没有匹配「'+esc(S.watchQ)+'」的自选</td></tr>')
       + '</tbody></table>';
     $('#tradeNote').textContent = '共 '+D.watch.length+' 只自选 · 行情快线 '+hhmm(lastUpdate)+' 更新(每 3s)· 点击行看详情。';
+  } else {
+    const q = S.watchQ.trim().toLowerCase();
+    const all = D.trades || [];
+    const rows = all.filter(t=>!q || String(t.code).includes(q) || String(t.name||'').toLowerCase().includes(q));
+    const closed = all.filter(t=>t.sell_date);
+    const netSum = closed.reduce((s,t)=>s+(t.net||0),0);
+    $('#tradeBody').innerHTML = '<table><thead><tr><th>轮次</th><th>股票</th><th class="num">股数</th><th class="num">买入</th><th class="num">卖出</th><th>卖出日</th><th class="num">净额</th><th class="num">盈亏%</th></tr></thead><tbody>'
+      + (rows.length ? rows.map(t=>{
+          const live = t.sell == null;
+          return '<tr class="row-hover clickable" data-act="open-chart" data-code="'+esc(t.code)+'" data-name="'+esc(t.name||t.code)+'">'
+            + '<td class="tsmall">'+md(t.round_date)+'</td>'
+            + '<td><b>'+esc(t.name)+'</b><span class="code">'+esc(t.code)+'</span></td>'
+            + '<td class="num">'+m0(t.shares)+'</td>'
+            + '<td class="num">'+mpx(t.buy)+'</td>'
+            + '<td class="num">'+(live ? '<span class="tag-acc">持仓中</span>' : mpx(t.sell))+'</td>'
+            + '<td class="tsmall">'+md(t.sell_date)+'</td>'
+            + '<td class="num '+cls(t.net)+'">'+(live ? '—' : mSgn(t.net))+'</td>'
+            + '<td class="num '+cls(t.pct)+'">'+(live ? '—' : sgn(t.pct)+'%')+'</td></tr>';
+        }).join('')
+        : '<tr><td colspan="8" style="color:var(--mut)">'+(q ? '没有匹配「'+esc(S.watchQ)+'」的交易' : '暂无交易记录')+'</td></tr>')
+      + '</tbody></table>';
+    $('#tradeNote').textContent = '共 '+all.length+' 笔(已结算 '+closed.length+' · 持仓中 '+(all.length-closed.length)+') · 已实现净额 '+mSgn(netSum)+' · 点击行打开原生 K 线。';
   }
 
   const lvS = D.stocklv, lvF = D.futlv;
