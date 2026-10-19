@@ -71,7 +71,7 @@ def ledger_entries(month: str = None, start: str = None, end: str = None,
     if category:
         where = (where + " AND " if where else "") + "c.name=?"
         args = args + [category]
-    q = ("SELECT e.id, e.date, e.payee, e.amount, e.note, e.source,"
+    q = ("SELECT e.id, e.date, e.payee, e.amount, e.note, e.source, e.created_at,"
          " c.name category FROM ledger_entries e"
          " JOIN ledger_categories c ON c.id=e.category_id"
          f"{' WHERE ' + where if where else ''}"

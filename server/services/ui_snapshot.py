@@ -74,17 +74,22 @@ def push_snapshot():
         }
         recent = pq("SELECT id,kind,title,status,retries,created_at,sent_at,dedup_key,body"
                     " FROM push_outbox ORDER BY id DESC LIMIT 16")
-        ids = [r["id"] for r in recent]
+        # 今日全部记录(时间轴事件流用;面板仍只显示 recent 16 条)
+        today_rows = pq("SELECT id,kind,title,status,retries,created_at,sent_at,dedup_key,body"
+                        " FROM push_outbox WHERE created_at LIKE ? ORDER BY id DESC LIMIT 200",
+                        (time.strftime("%Y-%m-%d") + "%",))
+        ids = [r["id"] for r in recent + today_rows]
         dv = pq("SELECT outbox_id,target,ok,error FROM push_delivery WHERE outbox_id>=?",
                 (min(ids) if ids else 0,))
         bydv = {}
         for d in dv:
             bydv.setdefault(d["outbox_id"], []).append(d)
-        for r in recent:
+        for r in recent + today_rows:
             r["kcn"] = KIND_CN.get(r["kind"], r["kind"])
             r["body"] = (r["body"] or "")[:4000]
             r["deliveries"] = bydv.get(r["id"], [])
         push["recent"] = recent
+        push["today"] = today_rows
     finally:
         pc.close()
     return push
@@ -229,3 +234,23 @@ def build_bootstrap() -> dict:
         "feishu": feishu, "push": push, "modules": mods,
         "pool": pool_snapshot(),
     }
+
+
+def build_live() -> dict:
+    """盘中轻量切片(前端秒级轮询):组合口径 / 买卖明细 / 自选行情 / 推送面板。
+
+    与 build_bootstrap 同形同源,只取分钟级会变的部分;账本/待办/系统/文件等
+    低频数据留给首屏快照与 60s 兜底全量刷新。"""
+    portfolio = try_call(_portfolio.portfolio) or {}
+    trades = try_call(_portfolio.portfolio_trades, 500) or []
+    quotes = try_call(_market.market_quotes) or {"watchlist": [], "indices": {}, "updated_at": None, "fails": 0}
+    try:
+        push = push_snapshot()
+    except Exception as e:
+        print("[watchdog] ui live: push ->", e)
+        push = None
+    return {"portfolio": portfolio, "trades": trades,
+            "watch": quotes.get("watchlist") or [],
+            "quotes": {"indices": quotes.get("indices") or {}, "updated_at": quotes.get("updated_at"),
+                       "fails": quotes.get("fails", 0)},
+            "push": push}

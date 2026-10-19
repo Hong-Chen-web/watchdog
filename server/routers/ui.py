@@ -3,6 +3,7 @@
 - GET  /ui                    → server/static/index.html(无数据,运行时拉 bootstrap)
 - GET  /ui-assets/{path}      → 拆分后的 css/js 静态资源(带目录穿越防护)
 - GET  /api/ui/bootstrap      → 首屏数据快照(services/ui_snapshot.build_bootstrap)
+- GET  /api/ui/live           → 盘中轻量切片(组合/明细/自选行情/推送;前端秒级轮询)
 - POST /api/ai/ask            → AI 只读问答(services/ai_query.ask;写入类由前端转调 smart-any)
 - PUT  /api/ui/push-master    → 飞书总开关(settings.push_master,off=只入箱不发送)
 """
@@ -52,6 +53,12 @@ def ui_asset(path: str):
 @router.get("/api/ui/bootstrap")
 def ui_bootstrap():
     return ui_snapshot.build_bootstrap()
+
+
+@router.get("/api/ui/live")
+def ui_live():
+    """盘中轻量切片:总资产/今日盈亏/持仓/自选行情/明细/推送(前端轮询用)。"""
+    return ui_snapshot.build_live()
 
 
 @router.post("/api/ai/ask")

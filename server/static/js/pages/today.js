@@ -1,6 +1,74 @@
 /* 看门狗 Web 工作台 · 今日页渲染 */
 /* ---------- 今日页 ---------- */
 function renderToday(){
+  renderTodayKpis();
+  renderTodayHoldings();
+
+  const RNG = { '1m':'近 1 月', '3m':'近 3 月', 'all':'全部' };
+  $('#rangeSeg').innerHTML = '<div class="dd" id="rangeDD"><button class="dd-btn" data-act="dd-toggle">'+RNG[S.range]
+    +'<svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button><div class="dd-menu">'
+    + Object.keys(RNG).map(v=>'<div class="dd-item'+(S.range===v?' on':'')+'" data-act="range" data-v="'+v+'">'+RNG[v]
+      + (S.range===v?'<svg viewBox="0 0 24 24"><path d="M5 12l4.5 4.5L19 7"/></svg>':'')+'</div>').join('')
+    + '</div></div>';
+  renderChart();
+
+  renderTodayTimeline();
+}
+/* 今日时间轴:全事件流 — 流水 / 待办新建与完成 / 今日买卖 / 信号与卡片推送 / 台账同步 + 计划锚点。
+   实际事件按发生时间升序;同一时刻计划锚点排在实际事件后;窗口贴底时自动跟随最新事件。 */
+function renderTodayTimeline(){
+  const T = TODAY0_STR, ev = [];
+  /* 计划锚点(全天时间骨架) */
+  ev.push({ts:'09:15:00', pri:1, cls:'tl-plan', d:{act:'open-tl', k:'auction'}, text:'集合竞价开始'});
+  ev.push({ts:'14:55:00', pri:1, cls:'tl-plan', d:{act:'open-tl', k:'select'},
+    text:'自动选股 · 下一轮 '+D.tail.next_run_day+'(最近一轮 '+D.tail.date+' 已执行 · '+D.tail.stocks.length+' 只)'});
+  ev.push({ts:'15:00:00', pri:1, cls:'tl-plan', d:{act:'open-tl', k:'settle'}, text:'收盘结算 · 无卖出则持仓顺延(以 15:00 结算为准)'});
+  /* 实盘台账同步 */
+  if (D.live && D.live.synced_at) ev.push({ts:hhmm(D.live.synced_at)+':00', pri:2, cls:'tl-ok', d:{act:'open-tl', k:'sync'},
+    text:'实盘台账已同步 · 净值 '+m0(D.live.total_now)+' · 累计 '+D.live.rounds+' 回合'});
+  /* 今日流水(消费/收入,时间=记账时刻) */
+  todayEntries().forEach(e=>{
+    ev.push({ts:hhmm(e.created_at)+':00', pri:2, cls:'tl-ok', d:{act:'open-entry', id:e.id},
+      text:(e.amount<0?'消费':'收入')+' · '+esc(e.payee||e.category||'—')
+        +(e.note?' · '+esc(e.note):'')+' · '
+        +'<b class="'+(e.amount<0?'':'up')+'">'+(e.amount<0?'':'+')+m2(e.amount)+'</b>'});
+  });
+  /* 待办:今日新建 / 今日完成 */
+  (D.todos||[]).forEach(t=>{
+    if (String(t.created_at||'').slice(0,10)===T) ev.push({ts:hhmm(t.created_at)+':00', pri:2, cls:'tl-ok',
+      d:{act:'open-todo', id:t.id},
+      text:'新建待办「'+esc(t.title)+'」'+(t.due_date?' · 截止 '+md(t.due_date):'')});
+    if (t.done && String(t.completed_at||'').slice(0,10)===T) ev.push({ts:hhmm(t.completed_at)+':00', pri:2, cls:'tl-ok',
+      d:{act:'open-todo', id:t.id},
+      text:'完成待办「'+esc(t.title)+'」'});
+  });
+  /* 今日买卖(策略执行:卖出评估 14:55 / 收盘价买入 14:57) */
+  (D.trades||[]).forEach(t=>{
+    if (t.round_date===T) ev.push({ts:'14:57:00', pri:2, cls:'tl-ok',
+      d:{act:'open-chart', code:t.code, name:t.name||t.code},
+      text:'买入 '+esc(t.name)+' '+esc(t.code)+' · '+m0(t.shares)+' 股 @'+mpx(t.buy)+' · '+yuan(t.buy*t.shares)});
+    if (t.sell_date===T) ev.push({ts:'14:55:00', pri:2, cls:'tl-ok',
+      d:{act:'open-chart', code:t.code, name:t.name||t.code},
+      text:'卖出 '+esc(t.name)+' '+esc(t.code)+' · 净额 '+mSgn(t.net)+' · 盈亏 '+sgn(t.pct)+'%'});
+  });
+  /* 今日推送(信号卡/卖出卡/选股卡/持仓卡等,时间=入箱时刻) */
+  ((D.push||{}).today||[]).forEach(r=>{
+    ev.push({ts:hhmm(r.created_at)+':00', pri:2, cls:'tl-ok', d:{act:'open-push', id:r.id},
+      text:esc(r.kcn||r.kind)+' · '+esc(r.title)
+        +(r.status==='failed'?' <b class="dn">失败</b>':r.status==='skipped'?' <span class="tagsm">停发留档</span>':'')});
+  });
+  ev.sort((a,b)=> a.ts===b.ts ? (b.pri-a.pri) : (a.ts<b.ts?-1:1));
+  const tb = $('#tlBody');
+  const first = !tb.childElementCount;
+  const stick = tb.scrollHeight - tb.scrollTop - tb.clientHeight < 48;   /* 贴底才自动跟随 */
+  tb.innerHTML = ev.map(e=>'<div class="tl-row clickable" '
+    + Object.keys(e.d).map(k=>'data-'+k+'="'+String(e.d[k]).replace(/"/g,'&quot;')+'"').join(' ')
+    +'><span class="tl-time">'+e.ts.slice(0,5)+'</span><span class="tl-dot '+e.cls+'"></span>'
+    +'<span class="tl-main">'+e.text+'</span><span class="tl-go">›</span></div>').join('');
+  if (first || stick) tb.scrollTop = tb.scrollHeight;   /* 首帧直接看最新;之后贴底才跟随 */
+}
+/* 盘中轻量刷新用:指标块 / 持仓卡可单独重绘(不动图表与时间轴) */
+function renderTodayKpis(){
   const p = D.portfolio;
   $('#kpi-total').textContent = m0(p.total);
   $('#kpi-cashmv').textContent = '现金 '+m0(p.cash)+' · 持仓 '+m0(p.market_value);
@@ -13,15 +81,9 @@ function renderToday(){
   const mExp = D.summaries[D.months[0].month].expense;
   $('#kpi-exp').textContent = yuan(mExp);
   $('#kpi-exp2').textContent = '今天 '+yuan(todaySpend())+' · '+todayEntries().length+' 笔';
-
-  const RNG = { '1m':'近 1 月', '3m':'近 3 月', 'all':'全部' };
-  $('#rangeSeg').innerHTML = '<div class="dd" id="rangeDD"><button class="dd-btn" data-act="dd-toggle">'+RNG[S.range]
-    +'<svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button><div class="dd-menu">'
-    + Object.keys(RNG).map(v=>'<div class="dd-item'+(S.range===v?' on':'')+'" data-act="range" data-v="'+v+'">'+RNG[v]
-      + (S.range===v?'<svg viewBox="0 0 24 24"><path d="M5 12l4.5 4.5L19 7"/></svg>':'')+'</div>').join('')
-    + '</div></div>';
-  renderChart();
-
+}
+function renderTodayHoldings(){
+  const p = D.portfolio;
   $('#holdTitle').textContent = '持仓 '+p.holdings.length+' 只';
   const next = nextTradeDay(TODAY0_STR);
   $('#holdRule').textContent = '下一交易日 '+md(next)+' 满 3 日评估';
@@ -39,16 +101,6 @@ function renderToday(){
       +'<td class="num '+cls(h.pnl_pct)+'">'+sgn(h.pnl_pct)+'%</td>'
       +'<td><span class="tagsm">'+md(h.buy_date)+' 买入 · 第'+day+'日</span></td></tr>';
   }).join('');
-
-  const tl = [
-    {k:'sync', time:hhmm(D.live.synced_at||'')||'17:28', cls:'tl-ok', text:'实盘台账已同步 · 净值 '+m0(D.live.total_now)+' · 累计 '+D.live.rounds+' 回合'},
-    {k:'settle', time:'15:00', cls:'tl-plan', text:'收盘结算 · 无卖出则持仓顺延(以 15:00 结算为准)'},
-    {k:'select', time:'14:55', cls:'tl-plan', text:'自动选股 · 下一轮 '+D.tail.next_run_day+'(最近一轮 '+D.tail.date+' 已执行 · '+D.tail.stocks.length+' 只)'},
-    {k:'auction', time:'09:15', cls:'tl-plan', text:'集合竞价开始'},
-  ];
-  $('#tlBody').innerHTML = tl.map(t=>'<div class="tl-row clickable" data-act="open-tl" data-k="'+t.k+'">'
-    +'<span class="tl-time">'+t.time+'</span><span class="tl-dot '+t.cls+'"></span>'
-    +'<span class="tl-main">'+t.text+'</span><span class="tl-go">›</span></div>').join('');
 }
 function renderCal(){
   const _b = new Date(TODAY0_STR+'T00:00:00');

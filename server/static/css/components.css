@@ -183,6 +183,7 @@ td b{font-weight:650;color:var(--ink)}
 
 /* ---------- 时间轴 ---------- */
 .tl-row{display:flex;gap:12px;padding:8px 6px;font-size:13px;align-items:baseline;border-radius:10px}
+#tlBody{max-height:472px;overflow-y:auto;padding-right:2px}   /* 全事件流:滚动窗口,贴底自动跟随 */
 .tl-row:hover{background:rgba(165,207,245,.14)}
 .tl-time{width:46px;flex:none;color:var(--mut);font-size:12px}
 .tl-dot{width:8px;height:8px;border-radius:50%;flex:none;transform:translateY(-1px)}

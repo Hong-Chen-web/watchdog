@@ -55,7 +55,7 @@ const mkCell = v => { const raw = String(v==null?'':v);
   return /^\*{0,2}[\d,]+(\.\d+)?\*{0,2}$/.test(raw) ? '<b>'+mk(raw)+'</b>' : esc(raw); };
 const mkText = t => mk(esc(String(t==null?'':t)));
 function openPush(id){
-  const P = D.push, m = P.recent.find(x=>x.id===id); if(!m) return;
+  const P = D.push, m = P.recent.find(x=>x.id===id) || ((P.today||[]).find(x=>x.id===id)); if(!m) return;
   const nm = {}; P.channels.forEach(c=>nm[c.id]=c.name);
   let parsed = null; try { parsed = JSON.parse(m.body||''); } catch(e) {}
   const head = '<div class="fhd"><span class="tag-acc">'+esc(m.kcn)+'</span><b>'+esc(m.title)+'</b></div>';

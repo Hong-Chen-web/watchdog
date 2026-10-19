@@ -138,6 +138,31 @@ function boot(){
   if (['hold','watch','trades'].includes(_sg)){ S.tradeSeg = _sg; navigate('trade'); renderTrade(); }
 }
 setInterval(fetchFutures, 5000);
+
+/* ---------- 盘中实时刷新 ---------- */
+/* 轻量切片(总资产/今日盈亏/持仓现价/自选行情/明细/推送面板)每 3s,与后端行情快线同频;
+   60s 全量快照兜底(待办/账本/系统等低频数据);回到前台立即全量刷一次 */
+let liveBusy = false;
+function refreshLive(){
+  if (liveBusy || !D || document.hidden) return;
+  liveBusy = true;
+  fetch('/api/ui/live').then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(j=>{
+      if (!D) return;
+      if (j.portfolio) D.portfolio = j.portfolio;
+      if (j.watch) D.watch = j.watch;
+      if (j.quotes){ D.quotes = j.quotes; lastUpdate = D.quotes.updated_at || lastUpdate; }
+      if (j.trades){ D.trades = j.trades; buildCalMap(); }
+      if (j.push){ D.push = j.push; D.feishu.master = (j.push.master === 'on'); }
+      renderTodayKpis(); renderTodayHoldings(); renderTodayTimeline(); renderCal(); renderTrade(); renderPush();
+    })
+    .catch(()=>{/* 静默:下一轮再试 */})
+    .finally(()=>{ liveBusy = false; });
+}
+setInterval(refreshLive, 3000);
+setInterval(()=>{ if (!document.hidden) refreshData(); }, 60000);
+document.addEventListener('visibilitychange', ()=>{ if (!document.hidden) refreshData(); });
+
 fetch('/api/ui/bootstrap').then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
   .then(j=>{ ingest(j); boot(); })
   .catch(err=>{ const m = document.querySelector('.main');

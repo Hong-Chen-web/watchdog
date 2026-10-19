@@ -9,13 +9,17 @@ const wdNative = m => { if (wdBridge) wdBridge.postMessage(JSON.stringify(m));
 function ingest(j){
   D = j;
   TD.clear(); (D.live.curve||[]).forEach(c=>TD.add(c.date)); TD.add(TODAY0_STR);
+  buildCalMap();
+  lastUpdate = D.quotes.updated_at || '—';
+}
+/* 日历事件索引:首屏 ingest 与盘中轻量刷新共用(明细/流水变动后重建) */
+function buildCalMap(){
   for (const k of Object.keys(calMap)) delete calMap[k];
   (D.trades||[]).forEach(t=>{
     if (t.round_date) calPush(t.round_date).trades.push({side:'买', name:t.name, code:t.code, price:t.buy, shares:t.shares, round:t});
     if (t.sell_date) calPush(t.sell_date).trades.push({side:'卖', name:t.name, code:t.code, price:t.sell, shares:t.shares, pnl:t.net, pct:t.pct, round:t});
   });
   (D.entries||[]).forEach(e=>{ const c = calPush(e.date); if (e.amount<0){ c.spend += -e.amount; c.spendList.push(e); } });
-  lastUpdate = D.quotes.updated_at || '—';
 }
 /* ---------- 主题 / 语言(原生设置为源,URL 参数透传;浏览器直开时读 localStorage) ---------- */
 const URLQ = new URLSearchParams(location.search);
