@@ -302,6 +302,36 @@ class FlushRoutingTest(_DbSwapMixin, unittest.TestCase):
         conn.close()
         self.assertEqual(row["ok"], 0)   # 瞬时错误记 0(可重试语义)
 
+    def test_repush_to_target_records_and_targets_only(self):
+        """补发:只直发指定通道(不惊动广播/其他专线),落新终态记录;失败 19001 → ok=2。"""
+        fp.ensure_push("settle", "卖出卡", '{"text":"x"}', "t-orig")
+        conn = fp.dbm.connect()
+        oid = conn.execute("SELECT id FROM push_outbox WHERE dedup_key='t-orig'").fetchone()["id"]
+        conn.close()
+        ok, _err = fp.repush_to_target(oid, "b2")
+        self.assertTrue(ok)
+        self.assertEqual([w for w, *_ in self.sent], ["https://example.invalid/h2"])
+        conn = fp.dbm.connect()
+        row = conn.execute("""SELECT o.kind,o.title,o.status,d.ok FROM push_outbox o
+            JOIN push_delivery d ON d.outbox_id=o.id WHERE o.dedup_key LIKE 'repush:%'
+            ORDER BY o.id DESC LIMIT 1""").fetchone()
+        conn.close()
+        self.assertEqual((row["kind"], row["title"], row["status"], row["ok"]),
+                         ("settle", "卖出卡", "sent", 1))
+
+        def bad(webhook, kind, title, body):
+            raise RuntimeError("feishu code=19001 token invalid")
+        fp._send_webhook = bad
+        ok2, err2 = fp.repush_to_target(oid, "b2")
+        self.assertFalse(ok2)
+        self.assertIn("19001", err2)
+        conn = fp.dbm.connect()
+        row = conn.execute("""SELECT o.status,d.ok FROM push_outbox o
+            JOIN push_delivery d ON d.outbox_id=o.id WHERE o.dedup_key LIKE 'repush:%'
+            ORDER BY o.id DESC LIMIT 1""").fetchone()
+        conn.close()
+        self.assertEqual((row["status"], row["ok"]), ("failed", 2))
+
     def test_transient_failure_backoff_and_terminal_failed(self):
         """瞬时失败:退避 1m/5m/15m(第 4 次仍 15m);第 5 轮清理转 failed 终态(v24 口径)。"""
         def boom(webhook, kind, title, body):

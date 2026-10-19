@@ -21,7 +21,7 @@
 | JS 语法 | `node --check` 全部 11 个 js(清单取自 index.html) | 前端任意 js 语法错 |
 | 资源完整性 | index.html 引用的 15 个 js/css 全部存在;`core.js` 最先、`main.js` 最后 | 资源缺失/加载顺序错 |
 | Python 编译 | routers / services / tests / main.py | 后端语法错 |
-| 单元测试 | 24 例(下表),不触碰真实库 | 逻辑回归 |
+| 单元测试 | 25 例(下表),不触碰真实库 | 逻辑回归 |
 
 ### 单元测试用例清单(server/tests)
 
@@ -45,6 +45,7 @@
 | test_webhook_19001_marks_permanent_silent | webhook 失效(19001) → 单次尝试后静默,不阻塞消息 |
 | test_transient_failure_backoff_and_terminal_failed | 退避 1m/5m/15m;第 4 次仍 15m;第 5 轮转 failed 终态且**必须落库** |
 | test_direct_test_records_immediately | 「发送测试卡」直发后落终态记录(ok=1/2/0)→ 通道卡「状态/最近投递」立即可刷新 |
+| test_repush_to_target_records_and_targets_only | 补发:只直发指定通道(不惊动广播/其他专线),落新终态记录;失败 19001 → ok=2 |
 
 **test_futures_signal_dedup.py — 期货信号去重**
 
@@ -104,6 +105,7 @@
 | 2026-10-19 | ed1ef1c | 时间轴升序需滚到底看最新 | 人工核验 · 时间轴倒序 |
 | 2026-10-19 | 本批 | 「发送测试卡」直发不落投递记录→修好 webhook 后通道状态不刷新 | test_direct_test_records_immediately |
 | 2026-10-19 | 本批 | 账户卡复选框被 `.dwf input` 样式盖掉原生勾选外观(实际已勾选,看着像没勾) | 人工核验 · 飞书推送(勾选态可见) |
+| 2026-10-19 | 本批 | 专线静默期间已发账户卡无法补发(缺按通道补发能力) | test_repush_to_target_records_and_targets_only + 实操 #380-383 补发成功 |
 
 ## 5. 后续补测(已知缺口)
 

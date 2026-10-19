@@ -185,6 +185,53 @@ def record_direct_test(target_id: str, body_text: str, ok: bool, error: str = No
         conn.close()
 
 
+def repush_to_target(outbox_id: int, target_id: str):
+    """按需补发:把历史消息原样直发到指定通道(不经订阅路由,不打扰其他通道)。
+    落一条终态发件箱记录(kind/title/body 与原卡一致,dedup=repush:...)+该目标投递行,
+    时间轴/通道卡「最近投递」随之刷新。返回 (ok, error)。"""
+    conn = dbm.connect()
+    try:
+        src = conn.execute("SELECT kind,title,body FROM push_outbox WHERE id=?",
+                           (outbox_id,)).fetchone()
+        tgt = conn.execute("SELECT name,webhook FROM feishu WHERE id=?",
+                           (target_id,)).fetchone()
+    finally:
+        conn.close()
+    if not src:
+        raise ValueError(f"消息 #{outbox_id} 不存在")
+    if not tgt:
+        raise ValueError(f"通道 {target_id} 不存在")
+    try:
+        _send_webhook(tgt["webhook"], src["kind"], src["title"], src["body"])
+        ok, err = True, None
+    except Exception as e:
+        ok, err = False, str(e)[:200]
+    conn = dbm.connect()
+    try:
+        now = datetime.now()
+        cur = conn.execute(
+            "INSERT INTO push_outbox(kind,title,body,dedup_key,status,retries,last_error,sent_at)"
+            " VALUES(?,?,?,?,?,0,?,?)",
+            (src["kind"], src["title"], src["body"],
+             f"repush:{outbox_id}:{target_id}:{now.strftime('%Y-%m-%d %H:%M:%S.%f')}",
+             "sent" if ok else "failed",
+             None if ok else err,
+             now.strftime("%Y-%m-%d %H:%M:%S") if ok else None))
+        oid = cur.lastrowid
+        if ok:
+            conn.execute("INSERT OR REPLACE INTO push_delivery(outbox_id,target,ok)"
+                         " VALUES(?,?,1)", (oid, target_id))
+        else:
+            permanent = any(pe in (err or "").lower() or pe in (err or "")
+                            for pe in _PERMANENT_ERR)
+            conn.execute("INSERT OR REPLACE INTO push_delivery(outbox_id,target,ok,error)"
+                         " VALUES(?,?,?,?)", (oid, target_id, 2 if permanent else 0, err))
+        conn.commit()
+    finally:
+        conn.close()
+    return ok, err
+
+
 def _push_enabled() -> bool:
     """总开关:settings.push_master=='off' 时暂停一切飞书发送(消息入箱留档不发送)。"""
     try:
