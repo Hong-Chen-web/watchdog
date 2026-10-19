@@ -26,14 +26,15 @@ def _mask(hook: str) -> str:
 def _db_bots(conn):
     import json as _j
     rows = conn.execute(
-        "SELECT id,name,webhook,codes FROM feishu WHERE kind='bot' ORDER BY id").fetchall()
+        "SELECT id,name,webhook,codes,account_cards FROM feishu WHERE kind='bot' ORDER BY id").fetchall()
     out = []
     for r in rows:
         try:
             codes = _j.loads(r["codes"])
         except ValueError:
             codes = []
-        out.append({"id": r["id"], "name": r["name"], "webhook": r["webhook"], "codes": codes})
+        out.append({"id": r["id"], "name": r["name"], "webhook": r["webhook"], "codes": codes,
+                    "account_cards": int(r["account_cards"] or 0)})
     return out
 
 
@@ -127,6 +128,7 @@ class BotIn(BaseModel):
     name: str
     webhook: str
     codes: list[str] = []
+    account_cards: Optional[bool] = None   # 账户卡开关;None=不改(兼容旧客户端)
 
 
 def _save_json_atomic(name: str, data):
@@ -157,9 +159,10 @@ def feishu_bot_create(body: BotIn):
     conn = get_conn()
     try:
         conn.execute(
-            "INSERT INTO feishu(id,kind,name,webhook,codes) VALUES(?,?,?,?,?)",
+            "INSERT INTO feishu(id,kind,name,webhook,codes,account_cards) VALUES(?,?,?,?,?,?)",
             (uuid.uuid4().hex[:8], "bot", body.name.strip(), body.webhook.strip(),
-             json.dumps([c.strip() for c in body.codes if c.strip()])))
+             json.dumps([c.strip() for c in body.codes if c.strip()]),
+             1 if body.account_cards else 0))
         conn.commit()
         _sync_chan_json(conn)
         return {"ok": True}
@@ -173,10 +176,17 @@ def feishu_bot_update(bot_id: str, body: BotIn):
         raise HTTPException(400, "webhook 需为飞书 open API 地址")
     conn = get_conn()
     try:
-        cur = conn.execute(
-            "UPDATE feishu SET name=?, webhook=?, codes=? WHERE id=? AND kind='bot'",
-            (body.name.strip(), body.webhook.strip(),
-             json.dumps([c.strip() for c in body.codes if c.strip()]), bot_id))
+        codes_s = json.dumps([c.strip() for c in body.codes if c.strip()])
+        if body.account_cards is None:   # 未提供=保留现值(旧客户端兼容)
+            cur = conn.execute(
+                "UPDATE feishu SET name=?, webhook=?, codes=? WHERE id=? AND kind='bot'",
+                (body.name.strip(), body.webhook.strip(), codes_s, bot_id))
+        else:
+            cur = conn.execute(
+                "UPDATE feishu SET name=?, webhook=?, codes=?, account_cards=?"
+                " WHERE id=? AND kind='bot'",
+                (body.name.strip(), body.webhook.strip(), codes_s,
+                 1 if body.account_cards else 0, bot_id))
         conn.commit()
         if cur.rowcount == 0:
             raise HTTPException(404, f"bot {bot_id} 不存在")

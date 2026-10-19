@@ -47,6 +47,27 @@ document.addEventListener('click', ev=>{
   else if (a==='sim-scan'){ if (S.scanSim) return; S.scanSim = true; const b = $('#scanBtn'); b.textContent='扫描中…'; setTimeout(()=>{ b.textContent='模拟清理扫描'; S.scanSim=false; toast('模拟扫描完成 · 未真实执行清理(避免误删)'); }, 1300); }
   else if (a==='disk-analyze') toast('「磁盘分析」此入口暂未开放(后端 /api/disk/analyze 全盘走查较慢)');
   else if (a==='open-push') openPush(+el.dataset.id);
+  else if (a==='open-bot') openBot(el.dataset.id);
+  else if (a==='bot-save'){
+    const id = el.dataset.id;
+    const name = $('#botName').value.trim(), hook = $('#botHook').value.trim();
+    if (!name || !hook) return toast('名称与 Webhook 不能为空');
+    const codes = $('#botCodes').value.split(/[\s,，、]+/).filter(Boolean);
+    const acct = $('#botAcct').checked;
+    toast('保存中…');
+    fetch('/api/chan/feishu/bots/'+id, {method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, webhook: hook, codes, account_cards: acct})})
+      .then(r=> r.ok ? r.json() : r.json().catch(()=>({})).then(j=>{ throw new Error(j.detail||('HTTP '+r.status)); }))
+      .then(()=>refreshData())
+      .then(()=>{ toast('通道已保存 · 已写入'); openBot(id); })
+      .catch(e=>toast('保存失败:'+(e.message||'后端不可达')));
+  }
+  else if (a==='bot-test'){ toast('测试卡发送中…');
+    fetch('/api/chan/feishu/test', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({bot_id: el.dataset.id})})
+      .then(r=>r.json()).then(j=>{ toast(j.status==='sent' ? '测试卡已送达「'+j.target+'」 ✓'
+        : '测试失败:'+((j.last_error||'未知错误').replace('feishu ',''))); })
+      .catch(()=>toast('发送失败:后端不可达')); }
   else if (a==='push-master'){ const nv = !pushMasterOn();
     fetch('/api/ui/push-master', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({on:nv})})
       .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); D.push.master = nv?'on':'off'; D.feishu.master = nv; renderPush(); renderSys(); toast('飞书总开关 → '+(nv?'开':'关')+' · 已写入(off 时只入箱留档)'); })

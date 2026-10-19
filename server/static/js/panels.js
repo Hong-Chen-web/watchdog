@@ -9,9 +9,11 @@ function renderPush(){
     const st = c.ok ? '<span class="dot ok"></span><span class="tsmall" style="margin-left:2px">送达正常</span>'
                     : '<span class="dot warn"></span><span class="tsmall" style="margin-left:2px">'
                       + (c.err_code ? 'webhook '+c.err_code+' 失效 · 已静默' : '未投递过') + '</span>';
-    return '<div class="chcard"><div class="l1">'+st+'</div>'
+    return '<div class="chcard clickable" data-act="open-bot" data-id="'+esc(c.id)+'" title="点击编辑通道(Webhook / 订阅 / 账户卡)">'
+      +'<div class="l1">'+st+'</div>'
       +'<b>'+esc(c.name)+'</b>'
-      +'<span class="sub">' + (c.codes > 0 ? '订阅 ' + c.codes + ' 只' : '全员广播') + ' · 最近投递 #' + (c.last_id || '—') + '</span></div>';
+      +'<span class="sub">' + (c.codes > 0 ? '订阅 ' + c.codes + ' 只' + (c.account_cards ? ' + 账户卡' : '') : '全员广播')
+      + ' · 最近投递 #' + (c.last_id || '—') + ' ›</span></div>';
   }).join('');
   const st = P.stats;
   $('#pushStats').innerHTML = [
@@ -94,6 +96,38 @@ function openPush(id){
    +'<div class="dw-note">原型只读:数据来自本地发件箱 push_outbox / push_delivery,不会触发真实发送。</div>'
   );
   dwHead(m.title, m.kcn + ' · ' + m.created_at.slice(0,16));
+}
+
+/* ---------- 飞书通道编辑(重建 webhook / 改订阅 / 账户卡开关;写动作直打真接口) ---------- */
+function openBot(id){
+  fetch('/api/chan/feishu/config').then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(j=>{
+      const b = (j.bots||[]).find(x=>x.id===id); if(!b) throw new Error('通道不存在');
+      const c = ((D.push||{}).channels||[]).find(x=>x.id===id) || {};
+      const stText = c.ok === true ? '<span class="dot ok" style="margin-right:6px"></span>送达正常'
+        : (c.err_code ? '<span class="dot warn" style="margin-right:6px"></span>webhook '+c.err_code+' 失效 · 已静默'
+                      : '<span class="dot warn" style="margin-right:6px"></span>未投递过');
+      draw(
+        '<div class="dw-sec"><div class="hd">通道状态</div>'
+       + kv('状态', stText)
+       + kv('最近投递', c.last_id ? '#'+c.last_id : '—')
+       +'</div>'
+       +'<div class="dw-sec"><div class="hd">通道配置(保存即写入,真实生效)</div>'
+       +'<label class="dwf"><span>名称</span><input id="botName" value="'+esc(b.name||'')+'"></label>'
+       +'<label class="dwf"><span>Webhook 地址(飞书群机器人)</span><input id="botHook" value="'+esc(b.webhook||'')+'"></label>'
+       +'<label class="dwf"><span>订阅代码(空格分隔;留空 = 全员广播收全部)</span><input id="botCodes" value="'+esc((b.codes||[]).join(' '))+'" placeholder="sh.600000 sz.000001"></label>'
+       +'<label class="dwf row"><input type="checkbox" id="botAcct" '+(b.account_cards?'checked':'')+'>'
+       + '<span>同时接收账户卡(选股 / 持仓 / 买入 / 卖出)</span></label>'
+       +'</div>'
+       +'<div class="dw-actions">'
+       + '<button class="btn" data-act="bot-save" data-id="'+esc(b.id)+'">保存</button>'
+       + '<button class="btn ghost" data-act="bot-test" data-id="'+esc(b.id)+'">发送测试卡</button>'
+       +'</div>'
+       +'<div class="dw-note">测试卡会真发一条消息进该群。webhook 报 19001 = 地址已失效:到对应飞书群「设置 → 群机器人」重建后,把新地址贴回上面保存即可。</div>'
+      );
+      dwHead(b.name||'通道', '飞书机器人 · '+b.id);
+    })
+    .catch(e=>toast('读取通道配置失败:'+(e.message||'后端不可达')));
 }
 
 /* ---------- AI 记录:走后端 /api/ledger/smart-any(LLM 解析并直接落库) ---------- */

@@ -53,7 +53,7 @@ def push_snapshot():
         last = {}
         for d in pq("SELECT target, ok, error, outbox_id FROM push_delivery ORDER BY outbox_id DESC LIMIT 400"):
             last.setdefault(d["target"], d)
-        for c in pq("SELECT id, kind, name, codes FROM feishu ORDER BY rowid"):
+        for c in pq("SELECT id, kind, name, codes, account_cards FROM feishu ORDER BY rowid"):
             try:
                 n = len(json.loads(c["codes"] or "[]"))
             except Exception:
@@ -62,6 +62,7 @@ def push_snapshot():
             err = ld.get("error") or ""
             m = re.search(r"code=(\d+)", err)
             push["channels"].append({"id": c["id"], "name": c["name"], "codes": n,
+                                     "account_cards": int(c["account_cards"] or 0),
                                      "ok": ld.get("ok") == 1, "err_code": (m.group(1) if m else None),
                                      "last_id": ld.get("outbox_id")})
         st = {r["status"]: r["n"] for r in pq("SELECT status, count(*) n FROM push_outbox GROUP BY status")}

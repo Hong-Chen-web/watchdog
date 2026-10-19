@@ -48,11 +48,12 @@ def _norm_code(c: str) -> str:
 
 def _targets(kind: str, code: str = None):
     """通道定向:feishu.codes 为空=全员广播(收全部);非空=只投 code 命中订阅的通道。
-    无 code 的账户级卡(卖出/选股/持仓/报告)只进全员广播通道。"""
+    无 code 的账户级卡(卖出/选股/持仓/买入)进全员广播通道 + 勾了 account_cards 的专线。"""
     conn = dbm.connect()
     conn.row_factory = __import__("sqlite3").Row
     try:
-        rows = conn.execute("SELECT id, kind, name, webhook, codes FROM feishu").fetchall()
+        rows = conn.execute(
+            "SELECT id, kind, name, webhook, codes, account_cards FROM feishu").fetchall()
     finally:
         conn.close()
     out = []
@@ -61,7 +62,9 @@ def _targets(kind: str, code: str = None):
             subs = [s for s in json.loads(r["codes"] or "[]") if s]
         except Exception:
             subs = []
-        if not subs or (code and _norm_code(code) in {_norm_code(s) for s in subs}):
+        if not subs \
+           or (code and _norm_code(code) in {_norm_code(s) for s in subs}) \
+           or (not code and r["account_cards"]):
             out.append(dict(r))
     return out
 

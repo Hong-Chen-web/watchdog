@@ -2,8 +2,9 @@
 
 背景:此前 _targets() 无条件全量返回所有通道(注释"全员广播"),导致期货信号
 也会投到只订阅了个股 webhook 的专线。现在:feishu.codes 为空=全员广播;
-非空=只投 code 命中的订阅通道;无 code 的账户级卡(卖出/选股/持仓/报告)只进
-全员广播通道。(夹具全部为合成数据:虚构通道名/代码/example.invalid webhook。)
+非空=只投 code 命中的订阅通道;无 code 的账户级卡(卖出/选股/持仓/买入)进
+全员广播通道 + 勾了 account_cards 的专线。
+(夹具全部为合成数据:虚构通道名/代码/example.invalid webhook。)
 
 跑法:cd server && /Users/chenhong/github/czsc-repo/.venv/bin/python -m unittest tests.test_push_routing -v
 """
@@ -40,7 +41,8 @@ def _mk_db(with_outbox: bool = False) -> str:
     conn.execute("""CREATE TABLE feishu(
         id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('bot','notify')),
         name TEXT NOT NULL, webhook TEXT NOT NULL,
-        codes TEXT NOT NULL DEFAULT '[]')""")
+        codes TEXT NOT NULL DEFAULT '[]',
+        account_cards INTEGER NOT NULL DEFAULT 0)""")
     conn.executemany("INSERT INTO feishu(id,kind,name,webhook,codes) VALUES(?,?,?,?,?)",
                      FEISHU_ROWS)
     if with_outbox:
@@ -108,6 +110,24 @@ class TargetFilterTest(_DbSwapMixin, unittest.TestCase):
         for kind in ("settle", "selection", "plan", "holding_daily", "test"):
             self.assertEqual(self._ids(kind), ["n1"], kind)
 
+    def test_account_cards_flag_extends_to_dedicated(self):
+        # b1 勾「同时接收账户卡」→ 账户卡进 b1+广播;b2 未勾 → 只进广播;信号定向逻辑不变
+        conn = fp.dbm.connect()
+        conn.execute("UPDATE feishu SET account_cards=1 WHERE id='b1'")
+        conn.commit()
+        conn.close()
+        try:
+            for kind in ("settle", "selection", "plan", "holding_daily"):
+                self.assertEqual(self._ids(kind), ["b1", "n1"], kind)
+            self.assertEqual(self._ids("signal", "600003"), ["b2", "n1"])   # 未勾通道信号路由不变
+            self.assertEqual(self._ids("signal", "600001"), ["b1", "n1"])   # 勾了也只收命中订阅的信号
+            self.assertEqual(self._ids("signal", "688888"), ["n1"])         # 非订阅信号不进 b1
+        finally:
+            conn = fp.dbm.connect()
+            conn.execute("UPDATE feishu SET account_cards=0 WHERE id='b1'")
+            conn.commit()
+            conn.close()
+
     def test_unmatched_code_still_broadcast(self):
         self.assertEqual(self._ids("signal", "999999"), ["n1"])
 
@@ -115,8 +135,10 @@ class TargetFilterTest(_DbSwapMixin, unittest.TestCase):
         path = tempfile.mktemp(prefix="wd_bad_", suffix=".db")
         conn = sqlite3.connect(path)
         conn.execute("CREATE TABLE feishu(id TEXT PRIMARY KEY, kind TEXT, name TEXT,"
-                     " webhook TEXT, codes TEXT DEFAULT '[]')")
-        conn.execute("INSERT INTO feishu VALUES('x','bot','坏配置','https://e.invalid/x','not-json')")
+                     " webhook TEXT, codes TEXT DEFAULT '[]',"
+                     " account_cards INTEGER NOT NULL DEFAULT 0)")
+        conn.execute("INSERT INTO feishu(id,kind,name,webhook,codes)"
+                     " VALUES('x','bot','坏配置','https://e.invalid/x','not-json')")
         conn.commit()
         conn.close()
         orig = fp.dbm
@@ -186,6 +208,22 @@ class FlushRoutingTest(_DbSwapMixin, unittest.TestCase):
         fp.ensure_push("settle", "卖出卡", "", "t-settle")
         fp.flush_once()
         self.assertEqual(self._targets_of("t-settle"), ["n1"])
+
+    def test_account_card_routes_to_flagged_channel(self):
+        conn = fp.dbm.connect()
+        conn.execute("UPDATE feishu SET account_cards=1 WHERE id='b2'")
+        conn.commit()
+        conn.close()
+        try:
+            fp.ensure_push("selection", "选股卡", "", "t-sel2")
+            fp.flush_once()
+            self.assertEqual(self._targets_of("t-sel2"), ["b2", "n1"])
+            self.assertEqual(self._status("t-sel2")["status"], "sent")
+        finally:
+            conn = fp.dbm.connect()
+            conn.execute("UPDATE feishu SET account_cards=0 WHERE id='b2'")
+            conn.commit()
+            conn.close()
 
     def test_partial_failure_retries_and_marks_failed_target(self):
         calls = []
