@@ -276,6 +276,32 @@ class FlushRoutingTest(_DbSwapMixin, unittest.TestCase):
         conn.close()
         self.assertEqual(row["ok"], 2)
 
+    def test_direct_test_records_immediately(self):
+        """「发送测试卡」(指定通道直发)后落终态记录 → 通道卡「状态/最近投递」立即可刷新。"""
+        fp.record_direct_test("b2", "飞书通道正常 · 00:00:00", True)
+        conn = fp.dbm.connect()
+        row = conn.execute("""SELECT o.status,o.sent_at,d.ok FROM push_outbox o
+            JOIN push_delivery d ON d.outbox_id=o.id WHERE d.target='b2'
+            ORDER BY o.id DESC LIMIT 1""").fetchone()
+        conn.close()
+        self.assertEqual((row["status"], row["ok"]), ("sent", 1))
+        self.assertTrue(row["sent_at"])
+        fp.record_direct_test("b2", "飞书通道正常 · 00:00:01", False,
+                              "feishu code=19001 token invalid")
+        conn = fp.dbm.connect()
+        row = conn.execute("""SELECT o.status,d.ok FROM push_outbox o
+            JOIN push_delivery d ON d.outbox_id=o.id WHERE d.target='b2'
+            ORDER BY o.id DESC LIMIT 1""").fetchone()
+        conn.close()
+        self.assertEqual((row["status"], row["ok"]), ("failed", 2))   # 19001=永久拒 → ok=2
+        fp.record_direct_test("b2", "飞书通道正常 · 00:00:02", False, "network down")
+        conn = fp.dbm.connect()
+        row = conn.execute("""SELECT d.ok FROM push_outbox o
+            JOIN push_delivery d ON d.outbox_id=o.id WHERE d.target='b2'
+            ORDER BY o.id DESC LIMIT 1""").fetchone()
+        conn.close()
+        self.assertEqual(row["ok"], 0)   # 瞬时错误记 0(可重试语义)
+
     def test_transient_failure_backoff_and_terminal_failed(self):
         """瞬时失败:退避 1m/5m/15m(第 4 次仍 15m);第 5 轮清理转 failed 终态(v24 口径)。"""
         def boom(webhook, kind, title, body):

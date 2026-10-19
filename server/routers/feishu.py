@@ -102,12 +102,22 @@ def chan_feishu_test(body: FeishuTestIn = None):
             conn.close()
         if not row:
             raise HTTPException(404, f"机器人 {bot_id} 不存在")
+        from services.feishu_push import record_direct_test
+        ts = f"飞书通道正常 · {datetime.now().strftime('%H:%M:%S')}"
         try:
-            _send_webhook(row["webhook"], "test", "看门狗 · 推送测试",
-                          f"飞书通道正常 · {datetime.now().strftime('%H:%M:%S')}")
+            _send_webhook(row["webhook"], "test", "看门狗 · 推送测试", ts)
+            try:
+                record_direct_test(bot_id, ts, True)
+            except Exception:
+                pass  # 记账尽力而为,不影响测试结果返回
             return {"status": "sent", "target": row["name"]}
         except Exception as e:
-            return {"status": "failed", "target": row["name"], "last_error": str(e)[:200]}
+            es = str(e)[:200]
+            try:
+                record_direct_test(bot_id, ts, False, es)
+            except Exception:
+                pass
+            return {"status": "failed", "target": row["name"], "last_error": es}
     ensure_push("test", "看门狗 · 推送测试",
                 f"飞书通道正常 · {datetime.now().strftime('%H:%M:%S')}",
                 f"test:{datetime.now().strftime('%Y-%m-%d %H:%M')}")

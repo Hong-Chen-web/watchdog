@@ -21,7 +21,7 @@
 | JS 语法 | `node --check` 全部 11 个 js(清单取自 index.html) | 前端任意 js 语法错 |
 | 资源完整性 | index.html 引用的 15 个 js/css 全部存在;`core.js` 最先、`main.js` 最后 | 资源缺失/加载顺序错 |
 | Python 编译 | routers / services / tests / main.py | 后端语法错 |
-| 单元测试 | 23 例(下表),不触碰真实库 | 逻辑回归 |
+| 单元测试 | 24 例(下表),不触碰真实库 | 逻辑回归 |
 
 ### 单元测试用例清单(server/tests)
 
@@ -44,6 +44,7 @@
 | test_no_matching_channel_marks_skipped | 订阅过滤后无人收 → skipped(留档不重试) |
 | test_webhook_19001_marks_permanent_silent | webhook 失效(19001) → 单次尝试后静默,不阻塞消息 |
 | test_transient_failure_backoff_and_terminal_failed | 退避 1m/5m/15m;第 4 次仍 15m;第 5 轮转 failed 终态且**必须落库** |
+| test_direct_test_records_immediately | 「发送测试卡」直发后落终态记录(ok=1/2/0)→ 通道卡「状态/最近投递」立即可刷新 |
 
 **test_futures_signal_dedup.py — 期货信号去重**
 
@@ -84,7 +85,7 @@
 | 今日页 · 时间轴 | 打开今日页 | **时间倒序(最新在最上)**、贴顶 0 偏移;滚到中部触发重绘不跳位;行点击 → 对应抽屉(流水/待办/推送/台账/买卖→原生 K 线) |
 | 今日页 · 盘中刷新 | 交易时段停留 10s+ | `/api/ui/live` 每 3 秒一次;总资产/今日盈亏/持仓刷新但图表不重绘;`document.hidden` 不轮询;回前台立即全量 |
 | 交易页 · 分段 | 持仓/自选/买卖明细三段 | 买卖明细含今日买卖;`?seg=trades` 直达 |
-| 交易页 · 飞书推送 | 点通道卡 | 编辑抽屉(名称/webhook/订阅/账户卡)保存即生效;发送测试卡有真实结果返回 |
+| 交易页 · 飞书推送 | 点通道卡 | 编辑抽屉(名称/webhook/订阅/账户卡——**勾选态须肉眼可见**)保存即生效;发送测试卡有真实结果**且落档**,通道「状态/最近投递」立即刷新 |
 | 系统页 | 推送总开关/测试推送 | 总开关 off 时只入箱留档;测试卡进通知群 |
 | 原生壳 | `--chart 代码 [名称]` / 设置窗 | K 线窗打开、设置窗正常(WebView 桥 wd) |
 
@@ -101,6 +102,8 @@
 | 2026-10-19 | deaee37 | 专线收不到账户卡(无通道开关) | test_account_cards_flag_extends_to_dedicated + flush 版 |
 | 2026-10-19 | 本批 | 终态清理 UPDATE 无 commit,pendings 为空时随 close 回滚(僵尸 pending 复发口) | test_transient_failure_backoff_and_terminal_failed(第 5 轮断言) |
 | 2026-10-19 | ed1ef1c | 时间轴升序需滚到底看最新 | 人工核验 · 时间轴倒序 |
+| 2026-10-19 | 本批 | 「发送测试卡」直发不落投递记录→修好 webhook 后通道状态不刷新 | test_direct_test_records_immediately |
+| 2026-10-19 | 本批 | 账户卡复选框被 `.dwf input` 样式盖掉原生勾选外观(实际已勾选,看着像没勾) | 人工核验 · 飞书推送(勾选态可见) |
 
 ## 5. 后续补测(已知缺口)
 

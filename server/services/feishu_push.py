@@ -158,6 +158,33 @@ def ensure_push(kind: str, title: str, body: str, dedup_key: str,
         conn.close()
 
 
+def record_direct_test(target_id: str, body_text: str, ok: bool, error: str = None):
+    """直发测试卡(指定 bot,同步返回)后记账:落 kind='test' 发件箱 + 该目标投递记录,
+    状态直接终态(不入 pending,不经过发送线程),让通道卡「状态/最近投递」立即反映结果。"""
+    conn = dbm.connect()
+    try:
+        now = datetime.now()
+        cur = conn.execute(
+            "INSERT INTO push_outbox(kind,title,body,dedup_key,status,retries,last_error)"
+            " VALUES('test','看门狗 · 推送测试',?,?,?,0,?)",
+            (body_text, f"testbot:{target_id}:{now.strftime('%Y-%m-%d %H:%M:%S.%f')}",
+             "sent" if ok else "failed", None if ok else (error or "")[:200]))
+        oid = cur.lastrowid
+        if ok:
+            conn.execute("UPDATE push_outbox SET sent_at=datetime('now','localtime')"
+                         " WHERE id=?", (oid,))
+            conn.execute("INSERT OR REPLACE INTO push_delivery(outbox_id,target,ok)"
+                         " VALUES(?,?,1)", (oid, target_id))
+        else:
+            es = error or ""
+            permanent = any(pe in es.lower() or pe in es for pe in _PERMANENT_ERR)
+            conn.execute("INSERT OR REPLACE INTO push_delivery(outbox_id,target,ok,error)"
+                         " VALUES(?,?,?,?)", (oid, target_id, 2 if permanent else 0, es[:200]))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def _push_enabled() -> bool:
     """总开关:settings.push_master=='off' 时暂停一切飞书发送(消息入箱留档不发送)。"""
     try:

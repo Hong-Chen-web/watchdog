@@ -210,11 +210,11 @@ td b{font-weight:650;color:var(--ink)}
 .chcard.clickable:hover{transform:translateY(-1px);box-shadow:0 18px 40px -24px rgba(10,26,56,.45)}
 .dwf{display:flex;flex-direction:column;gap:6px;margin:9px 1px}
 .dwf>span{font-size:11.5px;color:var(--mut)}
-.dwf input{border:1px solid rgba(122,187,246,.45);border-radius:11px;padding:8px 11px;font-size:12.5px;
+.dwf input:not([type="checkbox"]){border:1px solid rgba(122,187,246,.45);border-radius:11px;padding:8px 11px;font-size:12.5px;
   color:var(--ink);background:rgba(255,255,255,.9);width:100%;box-sizing:border-box;font-family:inherit}
-.dwf input:focus{outline:none;border-color:var(--viz-hi);background:#fff;box-shadow:0 10px 26px -18px rgba(60,150,230,.6)}
+.dwf input:not([type="checkbox"]):focus{outline:none;border-color:var(--viz-hi);background:#fff;box-shadow:0 10px 26px -18px rgba(60,150,230,.6)}
 .dwf.row{flex-direction:row;align-items:center;gap:8px}
-.dwf.row input{width:auto}
+.dwf.row input[type="checkbox"]{width:16px;height:16px;flex:none;accent-color:var(--viz-hi)}
 .dwf.row>span{font-size:12px;color:var(--ink)}
 .push-row{display:flex;align-items:center;gap:10px;padding:8px 8px;border-bottom:1px solid var(--hair2);
   border-radius:10px;cursor:pointer;font-size:12.5px;transition:.13s}
