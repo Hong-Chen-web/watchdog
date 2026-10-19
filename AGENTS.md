@@ -93,6 +93,7 @@ pkill -x Watchdog        # 守护自动重启 App→新 sidecar;WebView 重载 /
 - 后端:直接用 venv python 调函数冒烟 + `curl` 真接口;数据类改动必须**用当日真实数据核对**(用户会拿规则逐条对)
 - Web UI(主界面):浏览器直接开 `http://127.0.0.1:8790/ui` 即可测全部交互(与 App 内同一页面);写动作会真落库,测试数据用完删(参考 /api/todos POST+DELETE、/api/ledger/entries DELETE)。无头截图加 `--run-all-compositor-stages-before-draw`,否则 .page 入场动画会冻在半程拍出"半透明"
 - UI 改动:AX 真实点击(AXPressAction)+ 必要时截图;改完的界面要跟用户确认观感
+- **★每次调整必跑回归(2026-10-19 定)**:`./scripts/regression.sh all`(tier1 离线 + tier2 联网,全绿才交付);新修的 bug 必须加回归用例并登记 `docs/TESTING.md`(用例清单 + 回归日志);改 Swift 另跑 `cd app/appkit && swift test`
 
 ## 8. 用户协作偏好(重要程度不亚于代码)
 

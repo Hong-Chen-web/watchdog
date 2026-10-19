@@ -276,6 +276,43 @@ class FlushRoutingTest(_DbSwapMixin, unittest.TestCase):
         conn.close()
         self.assertEqual(row["ok"], 2)
 
+    def test_transient_failure_backoff_and_terminal_failed(self):
+        """瞬时失败:退避 1m/5m/15m(第 4 次仍 15m);第 5 轮清理转 failed 终态(v24 口径)。"""
+        def boom(webhook, kind, title, body):
+            raise RuntimeError("network down")
+        fp._send_webhook = boom
+        fp.ensure_push("settle", "卖出卡", "", "t-backoff")
+        conn = fp.dbm.connect()
+        try:
+            def state():
+                return conn.execute(
+                    "SELECT retries,status,"
+                    " (julianday(next_try_at)-julianday(datetime('now','localtime')))*86400 d"
+                    " FROM push_outbox WHERE dedup_key='t-backoff'").fetchone()
+
+            fp.flush_once()
+            r = state()
+            self.assertEqual((r["retries"], r["status"]), (1, "pending"))
+            self.assertTrue(59 <= r["d"] <= 61, r["d"])
+            for exp_r, exp_wait in ((2, 300), (3, 900), (4, 900)):
+                conn.execute("UPDATE push_outbox SET"
+                             " next_try_at=datetime('now','localtime','-1 seconds')"
+                             " WHERE dedup_key='t-backoff'")
+                conn.commit()
+                fp.flush_once()
+                r = state()
+                self.assertEqual((r["retries"], r["status"]), (exp_r, "pending"),
+                                 (exp_r, r["status"]))
+                self.assertTrue(exp_wait - 3 <= r["d"] <= exp_wait + 3, r["d"])
+            # 第 5 轮:retries>=4 → failed 终态(可见、不再僵尸 pending)
+            fp.flush_once()
+            r = conn.execute("SELECT status,last_error FROM push_outbox"
+                             " WHERE dedup_key='t-backoff'").fetchone()
+            self.assertEqual(r["status"], "failed")
+            self.assertIn("重试超限", r["last_error"])
+        finally:
+            conn.close()
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

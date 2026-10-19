@@ -189,6 +189,7 @@ def flush_once():
         conn.execute("UPDATE push_outbox SET status='failed',"
                      " last_error='重试超限(4次仍失败)'"
                      " WHERE status='pending' AND retries>=4")
+        conn.commit()   # 立即落库:否则 pendings 为空时无后续提交,close 会回滚这条终态
         # 只处理退避到期的(1m/5m/15m;新建消息 next_try_at 为空=立即)
         pendings = conn.execute(
             "SELECT * FROM push_outbox WHERE status='pending' AND retries<=3"
