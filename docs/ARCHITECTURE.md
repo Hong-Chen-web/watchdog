@@ -35,7 +35,7 @@ personal-workbench/
 │   ├── services/                selection(选股+结算) / kline_store(K线底库) / stocks_monitor / futures_monitor /
 │   │                            feishu_push(事务性发件箱) / chan_backtest_mirror(台账镜像) / ui_snapshot(bootstrap 快照) /
 │   │                            ai_query(只读问答) / quotes / numbers_import / smart_entry / cleaner / mole_clean ...
-│   └── migrations/NNN_*.sql     SQLite 迁移(PRAGMA user_version 顺序执行;当前 v23)
+│   └── migrations/NNN_*.sql     SQLite 迁移(PRAGMA user_version 顺序执行;当前 v24)
 ├── data/                    运行数据(gitignore):klines.db / 轮档案 / 冷却簿 / 行业图 / 涨停滚动集 / fflow_cache.json
 └── docs/                    本文档 + img/(README 截图) + project-memory/(历史项目记忆,gitignore)
 ```

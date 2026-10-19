@@ -163,8 +163,14 @@ def flush_once():
     conn = dbm.connect()
     conn.row_factory = __import__("sqlite3").Row
     try:
+        # 重试超限(4 次仍失败)→ failed 终态(可见、计入统计,不再僵尸 pending)
+        conn.execute("UPDATE push_outbox SET status='failed',"
+                     " last_error='重试超限(4次仍失败)'"
+                     " WHERE status='pending' AND retries>=4")
+        # 只处理退避到期的(1m/5m/15m;新建消息 next_try_at 为空=立即)
         pendings = conn.execute(
             "SELECT * FROM push_outbox WHERE status='pending' AND retries<=3"
+            " AND (next_try_at IS NULL OR next_try_at<=datetime('now','localtime'))"
             " ORDER BY id LIMIT 20").fetchall()
         for m in pendings:
             targets = _targets(m["kind"])
@@ -199,9 +205,12 @@ def flush_once():
                     " sent_at=datetime('now','localtime') WHERE id=?", (m["id"],))
             else:
                 r = m["retries"] + 1
+                wait = BACKOFF[min(r, len(BACKOFF)) - 1]
                 conn.execute(
-                    "UPDATE push_outbox SET retries=?, last_error='部分目标失败' WHERE id=?",
-                    (r, m["id"]))
+                    "UPDATE push_outbox SET retries=?,"
+                    " next_try_at=datetime('now','localtime','+'||?||' seconds'),"
+                    " last_error='部分目标失败' WHERE id=?",
+                    (r, wait, m["id"]))
             conn.commit()
     finally:
         conn.close()
