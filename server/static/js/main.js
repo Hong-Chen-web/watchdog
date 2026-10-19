@@ -1,5 +1,9 @@
 /* 看门狗 Web 工作台 · 事件绑定 / 卡片折叠 / 启动与轮询(必须最后引入) */
 /* ---------- 事件绑定 ---------- */
+/* 原生下拉(select)变更不走 click 委托 */
+document.addEventListener('change', ev=>{
+  if (ev.target && ev.target.id === 'tradeRange'){ S.tradeRange = ev.target.value; renderTrade(); }
+});
 document.addEventListener('click', ev=>{
   document.querySelectorAll('.dd.open').forEach(d=>{ if(!d.contains(ev.target)) d.classList.remove('open'); });
   if (S.aiOpen && !ev.target.closest('#aiPanel') && !ev.target.closest('[data-act="ai-open"]')){

@@ -5,6 +5,9 @@ function renderTrade(){
   $('#tradeSeg').innerHTML = '<span data-act="seg" data-v="hold" class="'+(S.tradeSeg==='hold'?'on':'')+'">'+segCount()[0]+'</span>'
     + '<span data-act="seg" data-v="watch" class="'+(S.tradeSeg==='watch'?'on':'')+'">'+segCount()[1]+'</span>'
     + '<span data-act="seg" data-v="trades" class="'+(S.tradeSeg==='trades'?'on':'')+'">'+segCount()[2]+'</span>';
+  const rw = $('#tradeRangeWrap'), rs = $('#tradeRange');
+  if (rw) rw.hidden = S.tradeSeg !== 'trades';
+  if (rs) rs.value = S.tradeRange;
   const idx = D.quotes.indices;
   $('#idxPills').innerHTML = Object.entries(idx).map(([n,v],i)=>{
     return '<div class="pill"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 15l5-5 3.5 3.5L19 7"/></svg></div>'
@@ -37,9 +40,13 @@ function renderTrade(){
   } else {
     const q = S.watchQ.trim().toLowerCase();
     const all = D.trades || [];
-    const rows = all.filter(t=>!q || String(t.code).includes(q) || String(t.name||'').toLowerCase().includes(q));
-    const closed = all.filter(t=>t.sell_date);
+    const rng = ['10','30','all'].includes(S.tradeRange) ? S.tradeRange : '10';
+    const cut = rng === 'all' ? '' : dayShift(TODAY0_STR, 1 - parseInt(rng, 10));
+    const scope = cut ? all.filter(t=>(t.sell_date || t.round_date) >= cut) : all;
+    const rows = scope.filter(t=>!q || String(t.code).includes(q) || String(t.name||'').toLowerCase().includes(q));
+    const closed = scope.filter(t=>t.sell_date);
     const netSum = closed.reduce((s,t)=>s+(t.net||0),0);
+    const rangeLabel = rng === 'all' ? '全部' : '近' + rng + '天';
     $('#tradeBody').innerHTML = '<table><thead><tr><th>轮次</th><th>股票</th><th class="num">股数</th><th class="num">买入</th><th class="num">卖出</th><th>卖出日</th><th class="num">净额</th><th class="num">盈亏%</th></tr></thead><tbody>'
       + (rows.length ? rows.map(t=>{
           const live = t.sell == null;
@@ -53,9 +60,9 @@ function renderTrade(){
             + '<td class="num '+cls(t.net)+'">'+(live ? '—' : mSgn(t.net))+'</td>'
             + '<td class="num '+cls(t.pct)+'">'+(live ? '—' : sgn(t.pct)+'%')+'</td></tr>';
         }).join('')
-        : '<tr><td colspan="8" style="color:var(--mut)">'+(q ? '没有匹配「'+esc(S.watchQ)+'」的交易' : '暂无交易记录')+'</td></tr>')
+        : '<tr><td colspan="8" style="color:var(--mut)">'+(q ? '没有匹配「'+esc(S.watchQ)+'」的交易' : (all.length ? rangeLabel+'内暂无交易' : '暂无交易记录'))+'</td></tr>')
       + '</tbody></table>';
-    $('#tradeNote').textContent = '共 '+all.length+' 笔(已结算 '+closed.length+' · 持仓中 '+(all.length-closed.length)+') · 已实现净额 '+mSgn(netSum)+' · 点击行打开原生 K 线。';
+    $('#tradeNote').textContent = rangeLabel + ' · ' + scope.length + ' 笔(已结算 ' + closed.length + ' · 持仓中 ' + (scope.length - closed.length) + ') · 区间已实现净额 ' + mSgn(netSum) + (rng === 'all' ? '' : ' · 全部共 ' + all.length + ' 笔') + ' · 点击行打开原生 K 线。';
   }
 
   const lvS = D.stocklv, lvF = D.futlv;

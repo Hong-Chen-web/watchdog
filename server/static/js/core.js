@@ -104,6 +104,8 @@ const TD = new Set();   /* boot/ingest 时按当日填充 */
 function tradeDayIdx(d){ const a = [...TD].filter(x=>x>=d).sort(); return a.length ? a[0]===d ? 1+[...TD].filter(x=>x>=d && x<=d).length : 0 : 0; }
 function tradeDaysSince(d){ return [...TD].filter(x=>x>=d).length; } // 含买入日
 function nextTradeDay(after){ let d = new Date(after+'T00:00:00'); do { d.setDate(d.getDate()+1); } while (d.getDay()===0||d.getDay()===6); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function dayShift(d, n){ const x = new Date(d+'T00:00:00'); x.setDate(x.getDate()+n);
+  return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); }
 
 /* ---------- 汇总 ---------- */
 const undoneTodos = () => D.todos.filter(t=>!t.done);
@@ -118,7 +120,7 @@ function calPush(d, ev){ (calMap[d] = calMap[d] || {trades:[],spend:0,spendList:
 /* 事件索引由 ingest(D) 填充 */
 
 /* ---------- 状态 ---------- */
-const S = { page:'today', tradeSeg:'hold', range:'all', watchQ:'', calSel:null,
+const S = { page:'today', tradeSeg:'hold', range:'all', watchQ:'', calSel:null, tradeRange:'10',
             month:null, cat:'全部', lvStock:null, lvFut:null, scanSim:false,
             blind: localStorage.getItem('wd-blind')==='1', pushMaster:null, pushOpen:false, poolOpen:false,
             aiOpen:false, aiIntent:null, aiLog:[], aiBusy:false };

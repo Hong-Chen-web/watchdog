@@ -91,7 +91,12 @@
           <span data-act="seg" data-v="hold" class="on">持仓 · 2</span>
           <span data-act="seg" data-v="watch">自选 · 15</span>
         </div>
-        <div class="r"><div class="srch"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <div class="r"><label class="tselwrap" id="tradeRangeWrap" hidden><span class="tsmall">范围</span>
+          <select class="tsel" id="tradeRange" aria-label="买卖明细范围">
+            <option value="10" selected>近10天</option>
+            <option value="30">近30天</option>
+            <option value="all">全部</option>
+          </select></label><div class="srch"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
           <input id="watchQ" placeholder="搜索代码 / 名称" autocomplete="off"></div></div>
       </div>
       <div id="tradeBody"></div>

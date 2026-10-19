@@ -45,8 +45,8 @@ def main():
                                 "principal", "holdings")))
     chs = (b.get("push") or {}).get("channels") or []
     need = {"id", "name", "codes", "account_cards", "ok", "last_id"}
-    check("bootstrap: 飞书通道 >= 3 且字段齐全", len(chs) >= 3 and all(need <= set(c) for c in chs),
-          [sorted(set(c)) for c in chs][:1])
+    check("bootstrap: 飞书通道 >= 1 且字段齐全", len(chs) >= 1 and all(need <= set(c) for c in chs),
+          [sorted(set(c)) for c in chs][:1])   # 通道数量=用户数据(可增删),只校验非空且字段完整
     check("bootstrap: push.today 为列表", isinstance((b.get("push") or {}).get("today"), list))
     tl = b.get("tail") or {}
     check("bootstrap: 选股轮状态三键", all(k in tl for k in ("date", "stocks", "next_run_day")), tl)
