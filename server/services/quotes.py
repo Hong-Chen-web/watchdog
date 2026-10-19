@@ -133,7 +133,8 @@ def _check_alerts(wl: list):
                 from datetime import datetime as _dt
                 ensure_push("signal", f"自选异动 · {name}",
                             f"{name} {chg:+.2f}%(|涨跌|≥5% 当日首次)",
-                            f"alert:{code}:{_dt.now().strftime('%Y-%m-%d')}")
+                            f"alert:{code}:{_dt.now().strftime('%Y-%m-%d')}",
+                            code=code)
             except Exception:
                 pass
             break   # 单 tick 只发一条防轰炸

@@ -10,7 +10,7 @@ import subprocess
 import threading
 import time
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 
 DATA_DIR = None
 _seen = {}          # (code, kind, bar_time) -> True(当日去重)
@@ -157,9 +157,18 @@ def set_level(level: str):
     return True
 
 
+def _prune_seen(days: int = 30):
+    """去重簿裁剪:只留最近 N 天(键第 4 位=bar 日期串;防长期驻留膨胀)。"""
+    cut = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    with _lock:
+        for key in [k for k in list(_seen) if str(k[3])[:10] < cut]:
+            _seen.pop(key, None)
+
+
 def scan_once():
     """全自选扫一轮(按当前监控级别,什么级别就推什么级别)。"""
     level = get_level()
+    _prune_seen()
     import db as dbm
     conn = dbm.connect()
     conn.row_factory = __import__("sqlite3").Row
@@ -194,7 +203,8 @@ def push_out(out):
                        "信号": kind_cn(s["kind"]),
                        "价格": f"**{s['price']}**",
                        "时间": s["bar_time"][-5:]}],
-                footer=f"{tag}级 · 已确认 · {day}")
+                footer=f"{tag}级 · 已确认 · {day}",
+                code=s["code"])
     except Exception:
         pass
 

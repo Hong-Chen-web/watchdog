@@ -30,7 +30,7 @@ server/               FastAPI 后端
     futures_monitor.py    ★期货信号监控(级别可配,settings键 futures_monitor_level)
     feishu_push.py        ★飞书事务性发件箱(重试/幂等/多机器人定向)
     chan_backtest_mirror.py  实盘台账镜像(轮档案→SQLite,持仓/盈亏/资产曲线)
-  migrations/NNN_*.sql    数据库迁移(PRAGMA user_version 顺序执行,当前 v24)
+  migrations/NNN_*.sql    数据库迁移(PRAGMA user_version 顺序执行,当前 v25)
   watchdog-server.spec    PyInstaller frozen 打包配置(含 static 数据)
 data/                 运行数据(gitignore):klines.db/轮档案/冷却簿/行业图/信号滚动集
 ~/Library/Application Support/Workbench/workbench.db   主数据库(设置/自选/信号/台账)

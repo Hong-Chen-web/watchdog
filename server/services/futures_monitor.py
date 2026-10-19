@@ -91,8 +91,19 @@ def scan(symbol: str, level: str) -> dict:
 
 
 _BAR_CACHE = {}   # (symbol, minutes) -> bars,监控线程刷新,chart 端点兜底
-_SIG_SEEN = {}    # (symbol, kind, 当日) -> True(信号去重,重启后首轮静默基线)
-_SIG_PRIMED = {}  # symbol -> 是否已建基线
+_SIG_SEEN = {}    # (symbol, level, kind, 当日/bar时间) -> True(信号去重,重启后首轮静默基线)
+_SIG_PRIMED = {}  # (symbol, level) -> 是否已建基线
+_sig_lock = threading.Lock()
+_LEVEL_CN = {"1m": "1分钟", "5m": "5分钟", "15m": "15分钟", "30m": "30分钟",
+             "60m": "60分钟", "4h": "4小时", "1d": "日线"}
+
+
+def _prune_sig_seen(days: int = 30):
+    """去重簿裁剪:只留最近 N 天(键第 4 位含日期串,防长期驻留膨胀)。
+    窗口取 30 天,远超过信号在"最近两笔"稳定门内的存活期,不会误裁活键。"""
+    cut = time.strftime("%Y-%m-%d", time.localtime(time.time() - days * 86400))
+    for key in [k for k in tuple(_SIG_SEEN) if str(k[3])[:10] < cut]:
+        _SIG_SEEN.pop(key, None)
 
 
 def _detect_signals(symbol: str, c) -> list:
@@ -128,21 +139,27 @@ def _detect_signals(symbol: str, c) -> list:
 
 
 def _push_futures_signals(symbol: str, c, level: str = "5m"):
-    """新确认信号→飞书发件箱(期货只走通知群/全局,不进专属bot);级别入去重键与标题。"""
+    """新确认信号→飞书发件箱(投递目标按通道订阅 feishu.codes 定向);级别入去重键与标题。"""
     today = time.strftime("%Y-%m-%d")
     marks = _detect_signals(symbol, c)
-    if not _SIG_PRIMED.get((symbol, level)):
-        _SIG_PRIMED[(symbol, level)] = True      # 首轮=静默建基线
+    with _sig_lock:
+        _prune_sig_seen()
+        if not _SIG_PRIMED.get((symbol, level)):
+            _SIG_PRIMED[(symbol, level)] = True      # 首轮=静默建基线
+            for t, p, k in marks:
+                _SIG_SEEN[(symbol, level, k, today)] = True
+                _SIG_SEEN[(symbol, level, k, t)] = True
+            return []
+        fresh = []
         for t, p, k in marks:
-            _SIG_SEEN[(symbol, level, k, today)] = True
-        return []
-    fresh = []
-    for t, p, k in marks:
-        key = (symbol, level, k, today)
-        if key in _SIG_SEEN:
-            continue
-        _SIG_SEEN[key] = True
-        fresh.append((t, p, k))
+            if (symbol, level, k, t) in _SIG_SEEN:   # 同一 bar 信号永不重发(跨天防重复投递)
+                continue
+            day_key = (symbol, level, k, today)
+            if day_key in _SIG_SEEN:                 # 同品种同类当日只报一次(防轰炸)
+                continue
+            _SIG_SEEN[(symbol, level, k, t)] = True
+            _SIG_SEEN[day_key] = True
+            fresh.append((t, p, k))
     if fresh:
         try:
             from routers.pushscope import future_in_scope
@@ -150,17 +167,19 @@ def _push_futures_signals(symbol: str, c, level: str = "5m"):
                 return fresh                  # 范围外:不推
             # 用户口径:一品种一信号 = 一条独立消息
             from services.feishu_push import ensure_push, kind_cn, kind_dir
-            tag = "4小时" if level == "4h" else ""
+            cn = _LEVEL_CN.get(level, level)
+            tag = "" if level == "5m" else f" · {cn}"
             for t, p, k in fresh:
                 ensure_push(
                     "signal",
-                    f"📊 {FUT_NAMES.get(symbol, symbol)} · {kind_dir(k)}" + (f" · {tag}" if tag else ""), "",
+                    f"📊 {FUT_NAMES.get(symbol, symbol)} · {kind_dir(k)}{tag}", "",
                     f"fsig:{symbol}:{level}:{today}:{k}:{t}",
                     rows=[{"品种": FUT_NAMES.get(symbol, symbol),
                            "信号": kind_cn(k),
                            "价格": f"**{p}**",
                            "时间": t[-5:]}],
-                    footer=f"5分钟级 · 已确认 · {today}")
+                    footer=f"{cn}级 · 已确认 · {today}",
+                    code=symbol)
         except Exception:
             pass
     return fresh

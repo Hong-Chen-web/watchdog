@@ -5,6 +5,7 @@
 格式:带 rows 的消息渲染成卡片(header+表格+footer);纯文本走 text 兜底。
 """
 import json
+import re
 import threading
 import time
 import urllib.request
@@ -38,14 +39,31 @@ def kind_dir(k: str) -> str:
 _lock = threading.Lock()
 
 
+def _norm_code(c: str) -> str:
+    """代码归一:sh.600001 / 600001 / sz.000002 → 6 位数字;C0 等期货品种原样小写。"""
+    c = str(c or "").strip().lower()
+    m = re.search(r"\d{6}", c)
+    return m.group(0) if m else c
+
+
 def _targets(kind: str, code: str = None):
+    """通道定向:feishu.codes 为空=全员广播(收全部);非空=只投 code 命中订阅的通道。
+    无 code 的账户级卡(卖出/选股/持仓/报告)只进全员广播通道。"""
     conn = dbm.connect()
     conn.row_factory = __import__("sqlite3").Row
     try:
         rows = conn.execute("SELECT id, kind, name, webhook, codes FROM feishu").fetchall()
     finally:
         conn.close()
-    return [dict(r) for r in rows]      # 全员广播(用户 2026-10-09 口径)
+    out = []
+    for r in rows:
+        try:
+            subs = [s for s in json.loads(r["codes"] or "[]") if s]
+        except Exception:
+            subs = []
+        if not subs or (code and _norm_code(code) in {_norm_code(s) for s in subs}):
+            out.append(dict(r))
+    return out
 
 
 _TEMPLATE = {"signal": "blue", "settle": "red", "selection": "orange",
@@ -122,15 +140,16 @@ def _send_webhook(webhook: str, kind: str, title: str, body: str):
 
 
 def ensure_push(kind: str, title: str, body: str, dedup_key: str,
-                rows: list = None, footer: str = None):
-    """入箱(去重键唯一)。rows 提供则渲染卡片表格。"""
+                rows: list = None, footer: str = None, code: str = None):
+    """入箱(去重键唯一)。rows 提供则渲染卡片表格;code=本卡标的(按通道订阅 codes 定向)。"""
     if rows is not None or footer is not None:
         body = json.dumps({"text": body, "rows": rows, "footer": footer}, ensure_ascii=False)
     conn = dbm.connect()
     try:
         conn.execute(
-            "INSERT OR IGNORE INTO push_outbox(kind,title,body,dedup_key) VALUES(?,?,?,?)",
-            (kind, title, body, dedup_key))
+            "INSERT OR IGNORE INTO push_outbox(kind,title,body,dedup_key,code)"
+            " VALUES(?,?,?,?,?)",
+            (kind, title, body, dedup_key, code))
         conn.commit()
     finally:
         conn.close()
@@ -173,10 +192,15 @@ def flush_once():
             " AND (next_try_at IS NULL OR next_try_at<=datetime('now','localtime'))"
             " ORDER BY id LIMIT 20").fetchall()
         for m in pendings:
-            targets = _targets(m["kind"])
+            targets = _targets(m["kind"], m["code"])
             if not targets:
-                conn.execute("UPDATE push_outbox SET status='failed',"
-                             " last_error='无飞书配置(设置里配机器人)' WHERE id=?", (m["id"],))
+                if conn.execute("SELECT 1 FROM feishu LIMIT 1").fetchone():
+                    # 有通道但订阅过滤后无人收(如仅剩订阅通道且 code 不匹配)
+                    conn.execute("UPDATE push_outbox SET status='skipped',"
+                                 " last_error='订阅过滤后无匹配通道' WHERE id=?", (m["id"],))
+                else:
+                    conn.execute("UPDATE push_outbox SET status='failed',"
+                                 " last_error='无飞书配置(设置里配机器人)' WHERE id=?", (m["id"],))
                 conn.commit()
                 continue
             all_ok = True

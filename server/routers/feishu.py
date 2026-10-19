@@ -87,13 +87,30 @@ class FeishuTestIn(BaseModel):
 
 @router.post("/feishu/test")
 def chan_feishu_test(body: FeishuTestIn = None):
-    """直发测试消息到通知群(引擎已移除,不再代理 8787)。"""
+    """默认发通知群(走发件箱留档);指定 bot_id 时直发该机器人并同步返回结果。"""
     from services.feishu_push import ensure_push, flush_once
+    bot_id = (body.bot_id if body else None) or None
+    if bot_id:
+        from services.feishu_push import _send_webhook
+        conn = get_conn()
+        try:
+            row = conn.execute(
+                "SELECT name,webhook FROM feishu WHERE id=? AND kind='bot'",
+                (bot_id,)).fetchone()
+        finally:
+            conn.close()
+        if not row:
+            raise HTTPException(404, f"机器人 {bot_id} 不存在")
+        try:
+            _send_webhook(row["webhook"], "test", "看门狗 · 推送测试",
+                          f"飞书通道正常 · {datetime.now().strftime('%H:%M:%S')}")
+            return {"status": "sent", "target": row["name"]}
+        except Exception as e:
+            return {"status": "failed", "target": row["name"], "last_error": str(e)[:200]}
     ensure_push("test", "看门狗 · 推送测试",
                 f"飞书通道正常 · {datetime.now().strftime('%H:%M:%S')}",
                 f"test:{datetime.now().strftime('%Y-%m-%d %H:%M')}")
     flush_once()
-    import db as dbm2
     conn = get_conn()
     try:
         row = conn.execute(
