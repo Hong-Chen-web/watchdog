@@ -15,7 +15,7 @@ function renderToday(){
   renderTodayTimeline();
 }
 /* 今日时间轴:全事件流 — 流水 / 待办新建与完成 / 今日买卖 / 信号与卡片推送 / 台账同步 + 计划锚点。
-   实际事件按发生时间升序;同一时刻计划锚点排在实际事件后;窗口贴底时自动跟随最新事件。 */
+   按发生时间倒序(最新在最上);同一时刻计划锚点排在实际事件前;窗口贴顶时自动跟随最新事件。 */
 function renderTodayTimeline(){
   const T = TODAY0_STR, ev = [];
   /* 计划锚点(全天时间骨架) */
@@ -57,15 +57,17 @@ function renderTodayTimeline(){
       text:esc(r.kcn||r.kind)+' · '+esc(r.title)
         +(r.status==='failed'?' <b class="dn">失败</b>':r.status==='skipped'?' <span class="tagsm">停发留档</span>':'')});
   });
-  ev.sort((a,b)=> a.ts===b.ts ? (b.pri-a.pri) : (a.ts<b.ts?-1:1));
+  ev.sort((a,b)=> a.ts===b.ts ? (a.pri-b.pri) : (a.ts>b.ts?-1:1));   /* 倒序:最新在最上 */
   const tb = $('#tlBody');
   const first = !tb.childElementCount;
-  const stick = tb.scrollHeight - tb.scrollTop - tb.clientHeight < 48;   /* 贴底才自动跟随 */
+  const keepTop = tb.scrollTop, prevH = tb.scrollHeight;
+  const stickTop = keepTop < 48;                     /* 贴顶(正看最新)才自动跟随 */
   tb.innerHTML = ev.map(e=>'<div class="tl-row clickable" '
     + Object.keys(e.d).map(k=>'data-'+k+'="'+String(e.d[k]).replace(/"/g,'&quot;')+'"').join(' ')
     +'><span class="tl-time">'+e.ts.slice(0,5)+'</span><span class="tl-dot '+e.cls+'"></span>'
     +'<span class="tl-main">'+e.text+'</span><span class="tl-go">›</span></div>').join('');
-  if (first || stick) tb.scrollTop = tb.scrollHeight;   /* 首帧直接看最新;之后贴底才跟随 */
+  if (first || stickTop) tb.scrollTop = 0;           /* 首帧直接看最新;贴顶才跟随 */
+  else tb.scrollTop = Math.max(0, keepTop + (tb.scrollHeight - prevH));  /* 上翻看旧事件不打扰,补偿顶部落入的新行 */
 }
 /* 盘中轻量刷新用:指标块 / 持仓卡可单独重绘(不动图表与时间轴) */
 function renderTodayKpis(){
