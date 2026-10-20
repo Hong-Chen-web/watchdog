@@ -21,7 +21,7 @@
 | JS 语法 | `node --check` 全部 11 个 js(清单取自 index.html) | 前端任意 js 语法错 |
 | 资源完整性 | index.html 引用的 15 个 js/css 全部存在;`core.js` 最先、`main.js` 最后 | 资源缺失/加载顺序错 |
 | Python 编译 | routers / services / tests / main.py | 后端语法错 |
-| 单元测试 | 29 例(下表),不触碰真实库 | 逻辑回归 |
+| 单元测试 | 40 例(下表),不触碰真实库 | 逻辑回归 |
 
 ### 单元测试用例清单(server/tests)
 
@@ -74,14 +74,30 @@
 | test_empty_ledger | 空台账 → 空曲线 |
 | test_no_duplicate_dates | 绝不出现重复日期点(旧实现「最近一日」恒 0.00% 的根因) |
 
+**test_food.py — 健康页 /api/food**
+
+| 用例 | 守什么 |
+|---|---|
+| test_recommended_male_sedentary | Mifflin-St Jeor 推荐公式(男 175/80/30 久坐 → 1600) |
+| test_recommended_female_floor | 女性下限保护(不低于 1200);取整到 10 |
+| test_recommended_incomplete_profile_returns_none | 档案不全/超范围 → 不推荐 |
+| test_meal_auto_by_hour | 没选餐次按钟点归档(早/午/晚/加餐) |
+| test_clean_items_sanitize | AI 条目清洗:截断/限幅/非数字→未估/坏数据丢弃 |
+| test_overview_empty_defaults | 空态:目标 2000 兜底、7 天日历齐全 |
+| test_manual_add_patch_delete | 手动记录 → 改热量 → 删除全链路 |
+| test_add_requires_food | 空提交 400 |
+| test_ai_parse_failure_raises_text | 未配置大模型 → 400 文案(降级手动) |
+| test_ai_text_inserts_items | AI 拆条目落库(打桩,不出网) |
+| test_profile_and_target | 档案推荐/自定义目标/重存档案保留目标/清除回推荐/越界 400 |
+
 ## 2. tier2 · 联网冒烟(脚本自动跑,只读)
 
-`scripts/check_endpoints.py`,19 项断言:
+`scripts/check_endpoints.py`,20 项断言:
 
 | 接口 | 断言 |
 |---|---|
-| /api/health | status/db ok;schema ≥ 26;模块数 = 15 |
-| /api/ui/bootstrap | today = 服务器本地日期(前端跨日重载锚点);含 portfolio/todos/push/watch/tail;资产口径字段齐全;飞书通道 ≥ 1(数量=用户数据)且字段(id/name/codes/account_cards/ok/last_id);push.today 为列表;选股轮三键;自选列表 |
+| /api/health | status/db ok;schema ≥ 27;模块数 = 16 |
+| /api/ui/bootstrap | today = 服务器本地日期(前端跨日重载锚点);含 portfolio/todos/push/watch/tail/food;资产口径字段齐全;飞书通道 ≥ 1(数量=用户数据)且字段(id/name/codes/account_cards/ok/last_id);push.today 为列表;选股轮三键;自选列表 |
 | /api/ui/live | 五区块(portfolio/quotes/watch/push/trades);push 含 today/channels |
 | /api/portfolio | 12 个口径字段齐全(total/cash/市值/本金/累计与当日盈亏/持仓/同步时间等) |
 | /api/chan/feishu/config | bots 含 account_cards 字段 |
@@ -95,6 +111,8 @@
 | 今日页 · 时间轴 | 打开今日页 | **时间倒序(最新在最上)**、贴顶 0 偏移;滚到中部触发重绘不跳位;行点击 → 对应抽屉(流水/待办/推送/台账/买卖→原生 K 线) |
 | 今日页 · 盘中刷新 | 交易时段停留 10s+ | `/api/ui/live` 每 3 秒一次;总资产/今日盈亏/持仓刷新但图表不重绘;`document.hidden` 不轮询;回前台立即全量;页头「· 行情 HH:MM」随行情前进 |
 | 今日页 · 刷新自愈 | 注入渲染错误(如 D.feishu 缺失)后等 3s | 其它块照常重绘,总资产回到服务器值;live 超 20s 不成功时看门狗自动全量重拉 |
+| 健康页 · 记一笔 | 输入「两个包子一碗粥」回车;手动行;点 × 删除 | AI 拆成多条并估千卡(~5s),合计/进度条即时更新;餐次留「自动」按钟点归档;删除后合计回落 |
+| 健康页 · 热量目标 | 填身高/体重/年龄/性别/活动量保存 | 显示推荐值(男1500/女1200 下限);自定义目标覆盖推荐,清空回推荐;超标日红柱 |
 | 今日页 · 跨日/休眠唤醒 | App 跨夜不关,次日唤醒 | 首次轮询发现服务器日期≠页面日期 → **整页自动重载**;副标题日期=当天,状态随钟点(盘前/盘中/已收盘);时间轴/日历/买卖明细窗口锚点=当天 |
 | 今日页 · 最近一日 | 资产曲线 | 曲线每日一点(无重复日期);「最近一日」= 最后交易日 vs 前一交易日(不再恒 0.00%) |
 | 交易页 · 分段 | 持仓/自选/买卖明细三段 | 买卖明细含今日买卖;`?seg=trades` 直达 |
@@ -124,6 +142,7 @@
 | 2026-10-20 | 本批 | 净值曲线追加"最新持仓买入日 + summary.assets"伪日期点 → 同日重复两点 → 「最近一日」恒 0.00% | test_backtest_curve 全组 |
 | 2026-10-20 | 本批 | 监控级别胶囊乐观值:PUT 失败仍显示新级别(服务器仍旧级别),K 线窗按旧级别出图;且已开图窗不跟随监控级别切换 | 实操:失败注入回填 15m + 胶囊/服务器/图窗 chartdata 日志三处对齐(30m→15m);tier2 19 项 |
 | 2026-10-20 | 本批 | live 刷新链无隔离:渲染前任一异常(如 D.feishu 缺失)让 3s 轮询"请求照发、整页不重绘",看着像数据不刷新且无从判断 | 注入复现(feishu 缺失+total 篡改)→ 3s 内自愈回 85,965;页头新增「· 行情 HH:MM」新鲜度 |
+| 2026-10-20 | 本批 | 新功能:健康页(饮食明细 + AI 估热量 + 身高体重推荐目标),迁移 v27(food_entries + 模块 food) | test_food 11 例全绿;实操:AI「两个包子一碗粥」拆 3 条 660 kcal,手动/删除/档案/目标/7 天趋势全点过;tier2 20 项 |
 
 ## 5. 后续补测(已知缺口)
 

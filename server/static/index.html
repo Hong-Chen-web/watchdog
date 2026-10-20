@@ -17,6 +17,7 @@
   <div class="rico" data-act="nav" data-page="trade" title="交易"><svg viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 15l5-5 3.5 3.5L19 7"/><path d="M15 7h4v4"/></svg></div>
   <div class="rico" data-act="nav" data-page="money" title="金钱"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 14.5h2"/></svg></div>
   <div class="rico" data-act="nav" data-page="time" title="时间"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></div>
+  <div class="rico" data-act="nav" data-page="health" title="健康"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
   <div class="rail-div" aria-hidden="true"></div>
   <div class="rico" data-act="nav" data-page="sys" title="系统"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M8 7.5h.01M8 16.5h.01"/></svg></div>
   <div class="sp"></div>
@@ -168,6 +169,50 @@
     </div>
   </div>
 
+  <!-- ===== 健康 ===== -->
+  <div class="page" id="page-health">
+    <div class="card">
+      <div class="chead"><b>今日饮食</b><span class="tagsm" id="foodStat"></span>
+        <div class="r"><span class="tsmall" id="foodTargetTag"></span></div></div>
+      <div class="fprog"><i id="foodBar"></i></div>
+      <div id="foodBody"></div>
+      <div class="addbox">
+        <select id="foodMeal" class="tsel" style="width:78px;flex:none"></select>
+        <input id="foodText" placeholder="吃了什么?如:两个包子 一碗粥 一杯牛奶(回车 AI 估热量)" autocomplete="off">
+        <button class="btn" data-act="food-ai">AI 估热量记录</button>
+      </div>
+      <div class="addbox">
+        <input id="foodName" placeholder="食物名(手动)" style="max-width:200px" autocomplete="off">
+        <input id="foodPortion" placeholder="份量,如 1碗" style="max-width:110px" autocomplete="off">
+        <input id="foodKcal" type="number" placeholder="千卡" style="max-width:96px" autocomplete="off">
+        <button class="btn ghost" data-act="food-add">手动记录</button>
+      </div>
+      <div class="footnote">热量为估算值只做参考;点行末 × 删除。AI 依赖「系统 · 大模型」配置。</div>
+    </div>
+    <div class="card">
+      <div class="chead"><b>近 7 天趋势</b><span class="tagsm" id="foodWeekTag"></span></div>
+      <div class="fbars" id="foodBars"></div>
+      <div class="footnote">柱 = 当日合计千卡;虚线 = 每日目标;红柱 = 超标。</div>
+    </div>
+    <div class="card">
+      <div class="chead"><b>身体档案 · 每日热量目标</b><span class="tagsm">Mifflin-St Jeor × 活动系数 − 500(约每周 −0.5kg)</span></div>
+      <div class="addbox" style="flex-wrap:wrap">
+        <input id="hpHeight" type="number" placeholder="身高 cm" style="max-width:96px">
+        <input id="hpWeight" type="number" placeholder="体重 kg" style="max-width:96px">
+        <input id="hpAge" type="number" placeholder="年龄" style="max-width:76px">
+        <select id="hpSex" class="tsel" style="width:72px;flex:none"><option value="男">男</option><option value="女">女</option></select>
+        <select id="hpAct" class="tsel" style="width:104px;flex:none"></select>
+        <button class="btn" data-act="food-profile">保存档案并推荐目标</button>
+        <span class="tsmall" id="hpRec"></span>
+      </div>
+      <div class="addbox">
+        <input id="hpTarget" type="number" placeholder="自定义每日目标 kcal(覆盖推荐,留空=用推荐)" style="max-width:280px">
+        <button class="btn ghost" data-act="food-target">只改目标</button>
+      </div>
+      <div class="footnote">推荐 = (10×体重kg + 6.25×身高cm − 5×年龄 [男+5/女−161]) × 活动系数 − 500;下限 男 1500 / 女 1200 kcal。</div>
+    </div>
+  </div>
+
   <!-- ===== 系统 ===== -->
   <div class="page" id="page-sys">
     <div class="card">
@@ -280,6 +325,17 @@
       <div id="evBody" class="footnote" style="margin-top:2px"></div>
     </div>
   </div>
+  <!-- 健康右栏 -->
+  <div class="page" id="side-health">
+    <div class="card">
+      <div class="chead"><b>今日概览</b><span class="tagsm" id="sfTag"></span></div>
+      <div id="sideFoodBody"></div>
+    </div>
+    <div class="card">
+      <div class="chead"><b>怎么用</b></div>
+      <div class="footnote" style="margin-top:2px">一句话写吃了什么 → AI 拆条目并估千卡;数字是估算,重点是"总量有没有超"。身体档案填一次,目标自动推荐。</div>
+    </div>
+  </div>
   <!-- 系统右栏 -->
   <div class="page" id="side-sys">
     <div class="card">
@@ -342,6 +398,7 @@
 <script src="/ui-assets/js/pages/trade.js"></script>
 <script src="/ui-assets/js/pages/money.js"></script>
 <script src="/ui-assets/js/pages/time.js"></script>
+<script src="/ui-assets/js/pages/health.js"></script>
 <script src="/ui-assets/js/pages/sys.js"></script>
 <script src="/ui-assets/js/panels.js"></script>
 <script src="/ui-assets/js/drawers.js"></script>

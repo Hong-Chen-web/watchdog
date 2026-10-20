@@ -126,6 +126,19 @@ td b{font-weight:650;color:var(--ink)}
   background:rgba(165,207,245,.16);transition:.15s;color:var(--ink)}
 .addbox input::placeholder{color:var(--mut)}
 .addbox input:focus{outline:none;border-color:var(--viz-hi);background:#fff;box-shadow:0 10px 26px -18px rgba(60,150,230,.6)}
+/* 健康页:热量进度条 / 7 天条形 / 删除 */
+.fprog{height:10px;border-radius:99px;background:var(--hair2,rgba(10,26,56,.07));overflow:hidden;margin:10px 0 12px}
+.fprog i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--viz-hi),var(--viz-hi2));transition:width .35s}
+.fprog.over i{background:linear-gradient(90deg,#ff5a5f,#ff8a65)}
+.fbars{display:flex;align-items:flex-end;gap:8px;height:130px;padding:8px 2px 0;position:relative}
+.fbars .fb{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;min-width:0;height:100%}
+.fbars .fb i{display:block;width:100%;max-width:36px;border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,var(--viz-hi),var(--viz-hi2))}
+.fbars .fb.over i{background:linear-gradient(180deg,#ff5a5f,#ff8a65)}
+.fbars .fb b{font-size:10px;font-weight:700;color:var(--ink)}
+.fbars .fb small{font-size:9.5px;color:var(--mut);white-space:nowrap}
+.fbars .tline{position:absolute;left:0;right:0;border-top:1px dashed var(--viz-hi);opacity:.55;pointer-events:none}
+.fdel{cursor:pointer;color:var(--mut);font-size:15px;line-height:1;padding:2px 7px;border-radius:8px}
+.fdel:hover{color:#ff5a5f;background:rgba(255,90,95,.12)}
 
 /* ---------- 按钮 ---------- */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:12.5px;font-weight:650;padding:9px 18px;

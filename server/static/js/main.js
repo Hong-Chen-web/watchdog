@@ -50,6 +50,40 @@ document.addEventListener('click', ev=>{
       .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); $('#newTodo').value=''; return refreshData(); })
       .then(()=>{ navigate('time'); toast('待办已写入'); })
       .catch(()=>toast('写入失败:后端不可达')); }
+  else if (a==='food-ai'){ const t=$('#foodText').value.trim(); if(!t) return;
+    el.disabled = true;
+    fetch('/api/food', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({text: t, meal: $('#foodMeal').value || ''})})
+      .then(async r=>{ const j = await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.detail || ('HTTP '+r.status));
+        $('#foodText').value = '';
+        toast('已记 '+j.items.length+' 条 · 合计 '+f0(j.total)+' kcal(估算)'); return refreshData(); })
+      .catch(e=>toast('AI 记录失败:'+e.message))
+      .finally(()=>{ el.disabled = false; }); }
+  else if (a==='food-add'){ const food = $('#foodName').value.trim(); if(!food){ toast('填一下食物名'); return; }
+    fetch('/api/food', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({food: food, portion: $('#foodPortion').value.trim(),
+                            kcal: $('#foodKcal').value === '' ? null : $('#foodKcal').value,
+                            meal: $('#foodMeal').value || ''})})
+      .then(async r=>{ const j = await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.detail || ('HTTP '+r.status));
+        $('#foodName').value = $('#foodPortion').value = $('#foodKcal').value = '';
+        toast('已记录'); return refreshData(); })
+      .catch(e=>toast('记录失败:'+e.message)); }
+  else if (a==='food-del'){ fetch('/api/food/'+el.dataset.id, {method:'DELETE'})
+      .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return refreshData(); })
+      .then(()=>toast('已删除')).catch(()=>toast('删除失败')); }
+  else if (a==='food-profile'){
+    fetch('/api/food/profile', {method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({height_cm: $('#hpHeight').value, weight_kg: $('#hpWeight').value,
+                            age: $('#hpAge').value, sex: $('#hpSex').value, activity: $('#hpAct').value})})
+      .then(async r=>{ const j = await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.detail || ('HTTP '+r.status));
+        toast('档案已存 · 推荐每日 '+f0(j.recommended)+' kcal'); return refreshData(); })
+      .catch(e=>toast('保存失败:'+e.message)); }
+  else if (a==='food-target'){
+    fetch('/api/food/target', {method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({kcal: $('#hpTarget').value})})
+      .then(async r=>{ const j = await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.detail || ('HTTP '+r.status));
+        $('#hpTarget').value = ''; toast('每日目标已改为 '+f0(j.target)+' kcal'); return refreshData(); })
+      .catch(e=>toast('保存失败:'+e.message)); }
   else if (a==='sell-eval'){ dwHead('卖出评估','明日 '+nextTradeDay(TODAY0_STR)+' 尾盘'); draw('<div class="dw-sec"><div class="hd">将评估的持仓</div>'
       + D.portfolio.holdings.map(h=>kv(h.name, '第 '+tradeDaysSince(h.buy_date)+' 日 · 浮盈 '+sgn(h.pnl_pct)+'%')).join('')
       + '</div><div class="dw-sec"><div class="hd">规则</div><div class="dw-note" style="margin:0">满 3 个交易日 → 尾盘走;若跌停 → 跌停价跑(封死顺延);炸板累计 >3 → 走;收盘涨停 → 续命。'
@@ -121,6 +155,7 @@ document.addEventListener('click', ev=>{
 $('#watchQ').addEventListener('input', e=>{ S.watchQ = e.target.value; renderTrade(); });
 $('#aiInput').addEventListener('keydown', e=>{ if (e.key==='Enter'){ e.preventDefault(); aiSend(); } });
 $('#newTodo').addEventListener('keydown', e=>{ if (e.key==='Enter'){ e.preventDefault(); const b=document.querySelector('[data-act="add-todo"]'); if(b) b.click(); } });
+$('#foodText').addEventListener('keydown', e=>{ if (e.key==='Enter'){ e.preventDefault(); const b=document.querySelector('[data-act="food-ai"]'); if(b) b.click(); } });
 document.addEventListener('keydown', e=>{
   if (e.key==='Escape'){ closeDrawer(); if (S.aiOpen){ S.aiOpen = false; S.aiIntent = null; renderAi(); } }
   const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
@@ -158,7 +193,7 @@ $$('.head').forEach(h=>h.insertAdjacentHTML('beforeend',
 function boot(){
   document.title = wdLang === 'en' ? 'Watchdog' : '看门狗 Watchdog';
   S.calSel = TODAY0_STR; S.month = D.months[0].month;
-  renderToday(); renderCal(); renderTrade(); renderMoney(); renderTime(); renderSys(); renderModules(); renderPush(); renderPool(); renderAi();
+  renderToday(); renderCal(); renderTrade(); renderMoney(); renderTime(); renderHealth(); renderSys(); renderModules(); renderPush(); renderPool(); renderAi();
   syncEye();
   navigate('today');
   /* 支持 ?page=trade|money|time|sys 直达(用于无头截图验收) */

@@ -17,6 +17,7 @@ MODULE_REGISTRY = [
     {"id": "disk",      "icon": "broom"},
     {"id": "strategy",  "icon": "lightning"},
     {"id": "futures",   "icon": "compass"},
+    {"id": "food",      "icon": "heart"},
     {"id": "calendar",  "icon": "calendar-blank"}
 ]
 

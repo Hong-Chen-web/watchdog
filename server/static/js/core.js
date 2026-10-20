@@ -55,7 +55,7 @@ window.wdApplyLang = l => {
 function refreshData(){
   return fetch('/api/ui/bootstrap').then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
     .then(j=>{ ingest(j);
-      renderToday(); renderCal(); renderTrade(); renderMoney(); renderTime(); renderSys(); renderModules(); renderPush(); renderPool(); renderAi(); });
+      renderToday(); renderCal(); renderTrade(); renderMoney(); renderTime(); renderHealth(); renderSys(); renderModules(); renderPush(); renderPool(); renderAi(); });
 }
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
@@ -138,11 +138,13 @@ const kv = (k,v) => '<div class="dw-kv"><span>'+k+'</span><b>'+v+'</b></div>';
 
 /* ---------- 导航 ---------- */
 const PAGE_META = { today:['今日',''], trade:['交易','持仓 · 自选 · 选股 · 监控'],
-  money:['金钱','账本 · 预算 · 月度趋势'], time:['时间','待办 · 日志 · 复盘'], sys:['系统','主机 · 数据源 · 产物'] };
+  money:['金钱','账本 · 预算 · 月度趋势'], time:['时间','待办 · 日志 · 复盘'],
+  health:['健康','饮食 · 目标 · 趋势'], sys:['系统','主机 · 数据源 · 产物'] };
 if (wdLang === 'en'){
   PAGE_META.trade = ['Trade', 'Holdings · Watchlist · Selection · Monitor'];
   PAGE_META.money = ['Money', 'Ledger · Budget · Monthly trend'];
   PAGE_META.time  = ['Time',  'Todos · Journal · Review'];
+  PAGE_META.health = ['Health', 'Food · Target · Trend'];
   PAGE_META.sys   = ['System', 'Host · Sources · Artifacts'];
 }
 /* 今日页副标题:按"当前时钟"生成(盘中→已收盘随时间变化;跨日由 checkDayRollover 整页重载) */
@@ -176,7 +178,7 @@ function checkDayRollover(serverToday){
 function navigate(p){
   S.page = p;
   $$('.rail .rico').forEach(r => r.classList.toggle('on', r.dataset.page===p));
-  ['today','trade','money','time','sys'].forEach(k=>{
+  ['today','trade','money','time','health','sys'].forEach(k=>{
     $('#page-'+k).classList.toggle('on', k===p);
     $('#side-'+k).classList.toggle('on', k===p);
   });

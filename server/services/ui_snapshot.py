@@ -14,6 +14,7 @@ from pathlib import Path
 from routers import chan as _chan
 from routers import feishu as _feishu
 from routers import backtest as _backtest
+from routers import food as _food
 from routers import disk as _disk
 from routers import journal as _journal
 from routers import ledger as _ledger
@@ -225,6 +226,7 @@ def build_bootstrap() -> dict:
     return {
         "portfolio": portfolio, "trades": trades, "todos": todos,
         "today": date.today().isoformat(),
+        "food": try_call(_food.food_overview) or {},
         "months": months, "summaries": summaries, "entries": entries,
         "live": live, "selst": selst, "tail": tail,
         "stocklv": stocklv, "futlv": futlv, "signals": signals,
@@ -254,6 +256,7 @@ def build_live() -> dict:
         push = None
     return {"portfolio": portfolio, "trades": trades,
             "today": date.today().isoformat(),
+            "food": try_call(_food.food_overview) or {},
             "watch": quotes.get("watchlist") or [],
             "quotes": {"indices": quotes.get("indices") or {}, "updated_at": quotes.get("updated_at"),
                        "fails": quotes.get("fails", 0)},

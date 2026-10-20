@@ -158,7 +158,7 @@ const AI_KIND = {ledger:['账单','tag-red'], todo:['待办','tag-acc'], goal:['
   futures_level:['期货级别','tag-acc'], selection_run:['选股','tag-acc'], push_master:['推送开关','tag-red']};
 const MOD_ZH = {portfolio:'持仓', backtest:'实盘回测', todo:'待办', ledger:'账本', annual:'年度账单',
   budget:'预算', market:'行情', strategy:'策略信号', futures:'期货', calendar:'日历',
-  feishu:'飞书推送', sysmon:'系统监控', journal:'日志复盘', goals:'目标'};
+  feishu:'飞书推送', sysmon:'系统监控', journal:'日志复盘', goals:'目标', food:'饮食健康'};
 function renderAi(){
   $('#aiBar').style.display = S.aiOpen ? 'none' : '';
   $('#aiPanel').classList.toggle('on', !!S.aiOpen);

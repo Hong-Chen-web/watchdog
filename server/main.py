@@ -16,7 +16,7 @@ ensure_light_czsc()   # 必须最先:轻量 czsc 壳顶替 fat 包入口(wbt/pol
 
 import db as dbm
 from routers.common import http_error
-from routers import modules, todo, ledger, portfolio, backtest, sysmon, market, disk, journal, goals, chan, feishu, llm, pushscope
+from routers import modules, todo, ledger, portfolio, backtest, sysmon, market, disk, journal, goals, chan, feishu, llm, pushscope, food
 from routers import ui as webui
 
 # 模块 → router 的装配表(与 module_config 表的 module_id 对应)
@@ -35,6 +35,7 @@ MODULE_ROUTERS = {
     "chan":      chan.router,           # 缠论桥(监控/轮次/期货/飞书)
     "llm":       llm.router,            # 大模型配置(OpenAI 兼容,自然语言识别)
     "pushscope": pushscope.router,      # 飞书推送范围(哪些标的的信号推)
+    "food":      food.router,           # 健康页:饮食明细 + AI 估热量 + 热量目标
 }
 
 ALLOWED_ORIGINS = [

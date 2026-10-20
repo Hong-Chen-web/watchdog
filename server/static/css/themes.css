@@ -39,6 +39,8 @@ html[data-theme="dark"] .row-hover:hover,html[data-theme="dark"] .push-row:hover
 html[data-theme="dark"] .td-row:hover,html[data-theme="dark"] .cal-day:hover{background:rgba(101,178,246,.10)}
 html[data-theme="dark"] .srch{background:rgba(101,178,246,.10);border-color:rgba(101,178,246,.30)}
 html[data-theme="dark"] .addbox input{background:rgba(101,178,246,.10);border-color:rgba(101,178,246,.30)}
+html[data-theme="dark"] .fprog{background:rgba(255,255,255,.08)}
+html[data-theme="dark"] .fdel:hover{background:rgba(255,90,95,.18)}
 html[data-theme="dark"] .tip{background:#1E2734;border-color:rgba(255,255,255,.08)}
 html[data-theme="dark"] .toast{background:#212B3A;box-shadow:0 26px 56px -24px rgba(0,0,0,.7)}
 html[data-theme="dark"] .dd-menu{background:#1E2734;border:1px solid rgba(255,255,255,.08)}

@@ -63,7 +63,7 @@ class MigrationIntegrityTest(unittest.TestCase):
             tbls = {r[0] for r in conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table'")}
             for t in ("feishu", "push_outbox", "push_delivery", "settings",
-                      "watchlist", "todos", "ledger_entries"):
+                      "watchlist", "todos", "ledger_entries", "food_entries"):
                 self.assertIn(t, tbls, t)
 
             def cols(table):

@@ -33,14 +33,14 @@ def main():
     t0 = time.time()
     h = get("/api/health")
     check("health: status/db ok", h.get("status") == "ok" and h.get("db") == "ok", h)
-    check("health: schema >= 26", int(h.get("schema_version") or 0) >= 26, h.get("schema_version"))
-    check("health: 模块数 = 15", h.get("modules") == 15, h.get("modules"))
+    check("health: schema >= 27", int(h.get("schema_version") or 0) >= 27, h.get("schema_version"))
+    check("health: 模块数 = 16", h.get("modules") == 16, h.get("modules"))
 
     b = get("/api/ui/bootstrap", timeout=40)
     from datetime import date as _date
     check("bootstrap: today = 服务器本地日期(前端跨日重载锚点)",
           b.get("today") == _date.today().isoformat(), b.get("today"))
-    for k in ("portfolio", "todos", "push", "watch", "tail", "health"):
+    for k in ("portfolio", "todos", "push", "watch", "tail", "health", "food"):
         check(f"bootstrap: 含 {k}", k in b)
     pf = b.get("portfolio") or {}
     check("bootstrap: 资产口径字段齐全",
