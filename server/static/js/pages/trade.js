@@ -66,7 +66,9 @@ function renderTrade(){
   }
 
   const lvS = D.stocklv, lvF = D.futlv;
-  S.lvStock = S.lvStock || lvS.level; S.lvFut = S.lvFut || lvF.level;
+  /* 胶囊跟服务器真值走(写入进行中除外):重启/其它端切换后不会被本地旧值钉住 */
+  if (S.lvPending !== 's') S.lvStock = lvS.level;
+  if (S.lvPending !== 'f') S.lvFut = lvF.level;
   $('#lvStock').innerHTML = lvS.choices.map(c=>'<span class="lv'+(S.lvStock===c?' on':'')+'" data-act="lv" data-t="s" data-v="'+c+'">'+c+'</span>').join('');
   $('#lvFut').innerHTML = lvF.choices.map(c=>'<span class="lv'+(S.lvFut===c?' on':'')+'" data-act="lv" data-t="f" data-v="'+c+'">'+c+'</span>').join('');
 

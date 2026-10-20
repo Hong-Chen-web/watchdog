@@ -34,11 +34,17 @@ document.addEventListener('click', ev=>{
   else if (a==='mtrend'){ S.month = el.dataset.v; S.cat='全部'; renderMoney(); }
   else if (a==='month-shift'){ const i = D.months.findIndex(x=>x.month===S.month) - (+el.dataset.d); if(i>=0 && i<D.months.length){ S.month = D.months[i].month; S.cat='全部'; renderMoney(); } else toast('没有更多月份了'); }
   else if (a==='lv'){ const side = el.dataset.t==='s'?'s':'f', v = el.dataset.v;
-    if (side==='s') S.lvStock = v; else S.lvFut = v; renderTrade();
+    const key = side==='s' ? 'lvStock' : 'lvFut';
     const url = side==='s' ? '/api/chan/monitor-level' : '/api/chan/futures-level';
+    S.lvPending = side;                      /* 写入期间禁止轮询回填,胶囊不来回跳 */
+    S[key] = v; renderTrade();
     fetch(url, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({level:v})})
-      .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); toast('已切到 '+v+' · 已写入 settings 并触发重扫'); refreshData(); setTimeout(fetchFutures, 1200); })
-      .catch(()=>toast('写入失败:后端不可达')); }
+      .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status);
+        S.lvPending = null;
+        return refreshData().then(()=>{ toast('已切到 '+v+' · 已写入 settings 并触发重扫'); setTimeout(fetchFutures, 1200); }); })
+      .catch(()=>{ S.lvPending = null;
+        /* 失败不保留乐观值:回填服务器真实级别,避免"胶囊显示已切但图窗仍按旧级别" */
+        return refreshData().then(()=>toast('切换失败 · 当前服务器级别 '+(side==='s'?S.lvStock:S.lvFut))); }); }
   else if (a==='add-todo'){ const v = $('#newTodo').value.trim(); if(!v) return;
     fetch('/api/todos', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({title:v, priority:2})})
       .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); $('#newTodo').value=''; return refreshData(); })

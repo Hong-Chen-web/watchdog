@@ -33,19 +33,21 @@ public var tradesWindowRef: NSWindow?
 public func openChartWindow(code: String, name: String) {
     let full = chanFullCode(code)
     let bare = full.replacingOccurrences(of: "[^0-9]", with: "", options: .regularExpression)
-    let levels = bare.count == 6 ? ["5m", "30m", "60m", "4h", "day"] : ["5m", "15m", "30m", "60m", "4h", "day"]
+    let isStock = bare.count == 6
+    let levels = ["5m", "15m", "30m", "60m", "4h", "day"]   // 两侧一致(股票监控也支持 15m)
+    let path = isStock ? "/api/chan/monitor-level" : "/api/chan/futures-level"
     Task {
         // 默认级别跟随对应监控级别(股票=monitor-level,期货=futures-level),与外面所选一致
         struct LevelResp: Decodable { let level: String }
-        let path = bare.count == 6 ? "/api/chan/monitor-level" : "/api/chan/futures-level"
         let defLv = (try? await API.get(path, as: LevelResp.self))?.level
         await MainActor.run {
-            _openChart(full: full, name: name, levels: levels, defaultLevel: defLv)
+            _openChart(full: full, name: name, levels: levels, defaultLevel: defLv, levelPath: path)
         }
     }
 }
 
-private func _openChart(full: String, name: String, levels: [String], defaultLevel: String? = nil) {
+private func _openChart(full: String, name: String, levels: [String], defaultLevel: String? = nil,
+                        levelPath: String = "") {
     let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1080, height: 680),
                        styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
     win.isReleasedWhenClosed = false
@@ -119,6 +121,29 @@ private func _openChart(full: String, name: String, levels: [String], defaultLev
     win.center()
     win.makeKeyAndOrderFront(nil)
     load(lvBar.selected)
+    // 跟随监控级别:外面切股票/期货级别后,已开着的图窗 3s 内自动跟到新级别(不必重开)。
+    // 基准=开窗时的监控级别;只有它"变化"才跟,所以图窗内手动选的临时级别不会被无端覆盖。
+    if !levelPath.isEmpty {
+        var lastSrv = defaultLevel ?? ""
+        let timer = Timer(timeInterval: 3.0, repeats: true) { tm in
+            guard win.isVisible else { tm.invalidate(); return }
+            Task {
+                struct LevelResp: Decodable { let level: String }
+                guard let srv = (try? await API.get(levelPath, as: LevelResp.self))?.level,
+                      levels.contains(srv) else { return }
+                await MainActor.run {
+                    if lastSrv.isEmpty {
+                        lastSrv = srv          // 开窗时没取到监控级别 → 首次对齐
+                        if srv != lvBar.selected { lvBar.select(srv, fire: false); load(srv) }
+                    } else if srv != lastSrv {
+                        lastSrv = srv
+                        if srv != lvBar.selected { lvBar.select(srv, fire: false); load(srv) }
+                    }
+                }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+    }
     chartWindowRefs.append(win)
     chartWindowRefs.removeAll { !$0.isVisible }   // 已关的窗清引用
 }
