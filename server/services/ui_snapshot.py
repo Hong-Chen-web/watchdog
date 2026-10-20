@@ -8,6 +8,7 @@ import os
 import re
 import sqlite3
 import time
+from datetime import date
 from pathlib import Path
 
 from routers import chan as _chan
@@ -223,6 +224,7 @@ def build_bootstrap() -> dict:
 
     return {
         "portfolio": portfolio, "trades": trades, "todos": todos,
+        "today": date.today().isoformat(),
         "months": months, "summaries": summaries, "entries": entries,
         "live": live, "selst": selst, "tail": tail,
         "stocklv": stocklv, "futlv": futlv, "signals": signals,
@@ -251,6 +253,7 @@ def build_live() -> dict:
         print("[watchdog] ui live: push ->", e)
         push = None
     return {"portfolio": portfolio, "trades": trades,
+            "today": date.today().isoformat(),
             "watch": quotes.get("watchlist") or [],
             "quotes": {"indices": quotes.get("indices") or {}, "updated_at": quotes.get("updated_at"),
                        "fails": quotes.get("fails", 0)},

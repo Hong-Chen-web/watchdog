@@ -6,6 +6,22 @@ from .common import get_conn
 
 router = APIRouter(prefix="/api/backtest", tags=["backtest"])
 
+PRINCIPAL = 100000.0
+
+
+def _equity_curve(ledger: list, principal: float = PRINCIPAL) -> list:
+    """逐日净值:按 sell_date(未卖用 round_date)聚合已实现净额,同日并成一点。
+    不再追加伪日期点(旧实现用"最新持仓 round_date + summary.assets"追加,
+    会与当日已有点重复 → 曲线末两点相同 → 「最近一日」永远 0.00%)。"""
+    by_day, cum = {}, principal
+    for row in ledger:
+        d = row.get("sell_date") or row.get("round_date")
+        if not d:
+            continue
+        cum += row.get("realized_net") or 0
+        by_day[d] = round(cum, 0)
+    return [{"date": d, "equity": by_day[d]} for d in sorted(by_day)]
+
 
 def _portfolio_total():
     """当前总资产(与持仓卡同源:现金+浮动市值)。"""
@@ -26,19 +42,7 @@ def backtest_live():
     nets = [row.get("realized_net") or 0 for row in ledger]
     principal = summary.get("principal") or 100000.0
     realized = sum(nets)
-    # 按日聚合:同日多笔出场并成当日累计(一天一个坐标)
-    by_day = {}
-    cum = principal
-    for row in ledger:
-        d = row.get("sell_date") or row.get("round_date")
-        if not d:
-            continue
-        cum += row.get("realized_net") or 0
-        by_day[d] = round(cum, 0)
-    curve = [{"date": d, "equity": by_day[d]} for d in sorted(by_day)]
-    if summary.get("assets"):
-        curve.append({"date": m.get("round_date") or "now",
-                      "equity": summary["assets"]})
+    curve = _equity_curve(ledger, principal)
     return {
         "start_date": ledger[0].get("sell_date") or ledger[0].get("round_date") if ledger else None,
         "principal": principal,

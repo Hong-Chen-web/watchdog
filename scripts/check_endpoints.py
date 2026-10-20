@@ -37,6 +37,9 @@ def main():
     check("health: 模块数 = 15", h.get("modules") == 15, h.get("modules"))
 
     b = get("/api/ui/bootstrap", timeout=40)
+    from datetime import date as _date
+    check("bootstrap: today = 服务器本地日期(前端跨日重载锚点)",
+          b.get("today") == _date.today().isoformat(), b.get("today"))
     for k in ("portfolio", "todos", "push", "watch", "tail", "health"):
         check(f"bootstrap: 含 {k}", k in b)
     pf = b.get("portfolio") or {}

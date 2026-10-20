@@ -7,6 +7,7 @@ let wdLang = 'zh';   /* 'zh' | 'en',由 URL 参数/localStorage 决定 */
 const wdNative = m => { if (wdBridge) wdBridge.postMessage(JSON.stringify(m));
   else toast('桌面 App 内可用:'+(m.cmd==='kline'?'原生 K 线窗':'原生设置窗')); };
 function ingest(j){
+  if (checkDayRollover(j && j.today)) return;   /* 服务器已跨日 → 整页重载(重置 TODAY0_STR/日历/明细窗口) */
   D = j;
   TD.clear(); (D.live.curve||[]).forEach(c=>TD.add(c.date)); TD.add(TODAY0_STR);
   buildCalMap();
@@ -139,16 +140,38 @@ const kv = (k,v) => '<div class="dw-kv"><span>'+k+'</span><b>'+v+'</b></div>';
 const PAGE_META = { today:['今日',''], trade:['交易','持仓 · 自选 · 选股 · 监控'],
   money:['金钱','账本 · 预算 · 月度趋势'], time:['时间','待办 · 日志 · 复盘'], sys:['系统','主机 · 数据源 · 产物'] };
 if (wdLang === 'en'){
-  PAGE_META.today = ['Today', ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][_NOW.getMonth()]
-    + ' ' + _NOW.getDate() + ' (' + ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][_NOW.getDay()] + ') · '
-    + ([0,6].includes(_NOW.getDay()) ? 'Market closed' : (_NOW.getHours() < 15 ? 'Pre-close' : 'Closed'))];
   PAGE_META.trade = ['Trade', 'Holdings · Watchlist · Selection · Monitor'];
   PAGE_META.money = ['Money', 'Ledger · Budget · Monthly trend'];
   PAGE_META.time  = ['Time',  'Todos · Journal · Review'];
   PAGE_META.sys   = ['System', 'Host · Sources · Artifacts'];
-} else {
-  PAGE_META.today[1] = TODAY0_STR.slice(5).replace('-','月')+'日 周'+'日一二三四五六'[_NOW.getDay()]
-    + ([0,6].includes(_NOW.getDay()) ? ' · 休市' : (_NOW.getHours()<15 ? ' · 盘中/未收盘' : ' · 已收盘'));
+}
+/* 今日页副标题:按"当前时钟"生成(盘中→已收盘随时间变化;跨日由 checkDayRollover 整页重载) */
+function mktPhase(now){
+  const d = now.getDay();
+  if (d === 0 || d === 6) return 'off';
+  const hm = now.getHours() * 100 + now.getMinutes();
+  return hm < 930 ? 'pre' : (hm < 1500 ? 'open' : 'post');
+}
+function todaySub(){
+  const n = new Date(TODAY0_STR + 'T00:00:00');
+  const ph = mktPhase(new Date());
+  if (wdLang === 'en'){
+    const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][n.getMonth()];
+    const wd = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][n.getDay()];
+    return mo + ' ' + n.getDate() + ' (' + wd + ') · ' +
+      {off:'Market closed', pre:'Pre-open', open:'Open', post:'Closed'}[ph];
+  }
+  return TODAY0_STR.slice(5).replace('-','月') + '日 周' + '日一二三四五六'[n.getDay()] + ' · ' +
+    {off:'休市', pre:'盘前', open:'盘中', post:'已收盘'}[ph];
+}
+PAGE_META.today[1] = todaySub();
+/* 跨日检测:页面加载时固化的 TODAY0_STR 过期后,时间轴/日历/明细窗口会停在昨天 → 整页重载 */
+function checkDayRollover(serverToday){
+  if (serverToday && /^\d{4}-\d{2}-\d{2}$/.test(serverToday) && serverToday !== TODAY0_STR){
+    location.reload();
+    return true;
+  }
+  return false;
 }
 function navigate(p){
   S.page = p;
@@ -159,7 +182,7 @@ function navigate(p){
   });
   $('#sideCol').style.display = 'flex';
   $('#pageTitle').textContent = PAGE_META[p][0];
-  $('#pageSub').textContent = PAGE_META[p][1];
+  $('#pageSub').textContent = (p === 'today') ? todaySub() : PAGE_META[p][1];
   if (p === 'trade') fetchFutures();
   window.scrollTo({top:0, behavior:'smooth'});
 }

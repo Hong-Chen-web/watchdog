@@ -21,7 +21,7 @@
 | JS 语法 | `node --check` 全部 11 个 js(清单取自 index.html) | 前端任意 js 语法错 |
 | 资源完整性 | index.html 引用的 15 个 js/css 全部存在;`core.js` 最先、`main.js` 最后 | 资源缺失/加载顺序错 |
 | Python 编译 | routers / services / tests / main.py | 后端语法错 |
-| 单元测试 | 25 例(下表),不触碰真实库 | 逻辑回归 |
+| 单元测试 | 29 例(下表),不触碰真实库 | 逻辑回归 |
 
 ### 单元测试用例清单(server/tests)
 
@@ -65,14 +65,23 @@
 | test_rerun_is_idempotent | 重复迁移幂等 |
 | test_key_tables_and_columns | 关键列:push_outbox.retries/next_try_at(v24)、code(v25)、feishu.account_cards(v26) |
 
+**test_backtest_curve.py — 逐日净值曲线**
+
+| 用例 | 守什么 |
+|---|---|
+| test_cumulative_by_sell_day | 按卖出日聚合并累计;同日多笔并一点 |
+| test_open_round_uses_buy_date_zero_net | 未卖轮用买入日、净额 0(不虚增) |
+| test_empty_ledger | 空台账 → 空曲线 |
+| test_no_duplicate_dates | 绝不出现重复日期点(旧实现「最近一日」恒 0.00% 的根因) |
+
 ## 2. tier2 · 联网冒烟(脚本自动跑,只读)
 
-`scripts/check_endpoints.py`,18 项断言:
+`scripts/check_endpoints.py`,19 项断言:
 
 | 接口 | 断言 |
 |---|---|
 | /api/health | status/db ok;schema ≥ 26;模块数 = 15 |
-| /api/ui/bootstrap | 含 portfolio/todos/push/watch/tail;资产口径字段齐全;飞书通道 ≥ 3 且字段(id/name/codes/account_cards/ok/last_id);push.today 为列表;选股轮三键;自选列表 |
+| /api/ui/bootstrap | today = 服务器本地日期(前端跨日重载锚点);含 portfolio/todos/push/watch/tail;资产口径字段齐全;飞书通道 ≥ 1(数量=用户数据)且字段(id/name/codes/account_cards/ok/last_id);push.today 为列表;选股轮三键;自选列表 |
 | /api/ui/live | 五区块(portfolio/quotes/watch/push/trades);push 含 today/channels |
 | /api/portfolio | 12 个口径字段齐全(total/cash/市值/本金/累计与当日盈亏/持仓/同步时间等) |
 | /api/chan/feishu/config | bots 含 account_cards 字段 |
@@ -85,6 +94,8 @@
 |---|---|---|
 | 今日页 · 时间轴 | 打开今日页 | **时间倒序(最新在最上)**、贴顶 0 偏移;滚到中部触发重绘不跳位;行点击 → 对应抽屉(流水/待办/推送/台账/买卖→原生 K 线) |
 | 今日页 · 盘中刷新 | 交易时段停留 10s+ | `/api/ui/live` 每 3 秒一次;总资产/今日盈亏/持仓刷新但图表不重绘;`document.hidden` 不轮询;回前台立即全量 |
+| 今日页 · 跨日/休眠唤醒 | App 跨夜不关,次日唤醒 | 首次轮询发现服务器日期≠页面日期 → **整页自动重载**;副标题日期=当天,状态随钟点(盘前/盘中/已收盘);时间轴/日历/买卖明细窗口锚点=当天 |
+| 今日页 · 最近一日 | 资产曲线 | 曲线每日一点(无重复日期);「最近一日」= 最后交易日 vs 前一交易日(不再恒 0.00%) |
 | 交易页 · 分段 | 持仓/自选/买卖明细三段 | 买卖明细含今日买卖;`?seg=trades` 直达 |
 | 交易页 · 买卖明细范围 | 默认「近10天」;页头「范围」下拉切换 | 默认只显示最近 10 天(含今日)内有买卖动作的轮次;切近30天/全部即时刷新;底部「区间已实现净额」随范围变化;3s 轮询不打断下拉(控件静态在页头) |
 | 交易页 · 飞书推送 | 点通道卡 | 编辑抽屉(名称/webhook/订阅/账户卡——**勾选态须肉眼可见**)保存即生效;发送测试卡有真实结果**且落档**,通道「状态/最近投递」立即刷新 |
@@ -107,6 +118,8 @@
 | 2026-10-19 | 本批 | 「发送测试卡」直发不落投递记录→修好 webhook 后通道状态不刷新 | test_direct_test_records_immediately |
 | 2026-10-19 | 本批 | 账户卡复选框被 `.dwf input` 样式盖掉原生勾选外观(实际已勾选,看着像没勾) | 人工核验 · 飞书推送(勾选态可见) |
 | 2026-10-19 | 本批 | 专线静默期间已发账户卡无法补发(缺按通道补发能力) | test_repush_to_target_records_and_targets_only + 实操 #380-383 补发成功 |
+| 2026-10-20 | 本批 | WebView 跨夜/休眠后日期与盘中状态停在加载时刻(今日页显示昨日「已收盘」,时间轴/日历/明细窗口锚点全停在昨天;数据本身是新的) | tier2 today 断言 + 人工核验 · 跨日/休眠唤醒 |
+| 2026-10-20 | 本批 | 净值曲线追加"最新持仓买入日 + summary.assets"伪日期点 → 同日重复两点 → 「最近一日」恒 0.00% | test_backtest_curve 全组 |
 
 ## 5. 后续补测(已知缺口)
 

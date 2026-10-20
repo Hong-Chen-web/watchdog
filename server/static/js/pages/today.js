@@ -1,6 +1,7 @@
 /* 看门狗 Web 工作台 · 今日页渲染 */
 /* ---------- 今日页 ---------- */
 function renderToday(){
+  if (S.page === 'today') $('#pageSub').textContent = todaySub();   /* 盘中/已收盘等状态随时钟刷新 */
   renderTodayKpis();
   renderTodayHoldings();
 

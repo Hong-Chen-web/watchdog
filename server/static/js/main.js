@@ -174,6 +174,7 @@ function refreshLive(){
   fetch('/api/ui/live').then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
     .then(j=>{
       if (!D) return;
+      if (checkDayRollover(j.today)) return;   /* 跨日(休眠唤醒等)→ 整页重载 */
       if (j.portfolio) D.portfolio = j.portfolio;
       if (j.watch) D.watch = j.watch;
       if (j.quotes){ D.quotes = j.quotes; lastUpdate = D.quotes.updated_at || lastUpdate; }
