@@ -173,7 +173,12 @@ setInterval(fetchFutures, 5000);
 /* ---------- 盘中实时刷新 ---------- */
 /* 轻量切片(总资产/今日盈亏/持仓现价/自选行情/明细/推送面板)每 3s,与后端行情快线同频;
    60s 全量快照兜底(待办/账本/系统等低频数据);回到前台立即全量刷一次 */
-let liveBusy = false;
+let liveBusy = false, lastLiveOk = 0;
+/* 单块渲染失败不能拖垮整轮刷新:曾因渲染前抛错(D.feishu 缺失等)→ 整页停在旧帧,
+   但 3s 轮询请求照发,看起来就是"数据不刷新" */
+function safeRender(fn, tag){
+  try { fn(); } catch(e){ console.error('[render]', tag || fn.name, e); }
+}
 function refreshLive(){
   if (liveBusy || !D || document.hidden) return;
   liveBusy = true;
@@ -184,14 +189,24 @@ function refreshLive(){
       if (j.portfolio) D.portfolio = j.portfolio;
       if (j.watch) D.watch = j.watch;
       if (j.quotes){ D.quotes = j.quotes; lastUpdate = D.quotes.updated_at || lastUpdate; }
-      if (j.trades){ D.trades = j.trades; buildCalMap(); }
-      if (j.push){ D.push = j.push; D.feishu.master = (j.push.master === 'on'); }
-      renderTodayKpis(); renderTodayHoldings(); renderTodayTimeline(); renderCal(); renderTrade(); renderPush();
+      if (j.trades){ D.trades = j.trades; safeRender(buildCalMap, 'buildCalMap'); }
+      if (j.push){ D.push = j.push; if (D.feishu) D.feishu.master = (j.push.master === 'on'); }
+      lastLiveOk = Date.now();
+      safeRender(renderTodayKpis, 'todayKpis');
+      safeRender(renderTodayHoldings, 'todayHoldings');
+      safeRender(renderTodayTimeline, 'todayTimeline');
+      safeRender(renderCal, 'cal');
+      safeRender(renderTrade, 'trade');
+      safeRender(renderPush, 'push');
     })
-    .catch(()=>{/* 静默:下一轮再试 */})
+    .catch(()=>{/* 静默:下一轮再试,看门狗兜底 */})
     .finally(()=>{ liveBusy = false; });
 }
 setInterval(refreshLive, 3000);
+/* 看门狗:盘中 live 超过 20s 没成功(渲染抛错/接口卡住)→ 立即全量重拉,自愈不留旧帧 */
+setInterval(()=>{ if (!document.hidden && lastLiveOk && Date.now() - lastLiveOk > 20000) refreshData(); }, 5000);
+/* 从其它 App 切回来(窗口重新激活)也补一次全量,不依赖 visibilitychange */
+window.addEventListener('focus', ()=>{ if (!document.hidden) refreshData(); });
 setInterval(()=>{ if (!document.hidden) refreshData(); }, 60000);
 document.addEventListener('visibilitychange', ()=>{ if (!document.hidden) refreshData(); });
 

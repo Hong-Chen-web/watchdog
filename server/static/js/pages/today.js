@@ -78,6 +78,8 @@ function renderTodayKpis(){
   $('#kpi-day').className = 'num ' + cls(p.day_pnl);
   $('#kpi-day').textContent = mSgn(p.day_pnl);
   $('#kpi-day2').innerHTML = '<span class="'+cls(p.day_pnl)+'">'+p.day_pnl_pct.toFixed(2)+'%</span> · 持仓 '+p.holdings.length+' 只';
+  /* 新鲜度直接标在页头:行情时间不前进=没刷新,一眼可见 */
+  if (S.page === 'today') $('#pageSub').textContent = todaySub() + (wdLang === 'en' ? ' · Quotes ' : ' · 行情 ') + hhmm(lastUpdate);
   const un = undoneTodos();
   $('#kpi-todo').textContent = un.length;
   $('#kpi-todo2').textContent = '其中逾期 '+overdueTodos().length+' 件';
