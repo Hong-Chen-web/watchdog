@@ -202,6 +202,13 @@
         <input id="hpAge" type="number" placeholder="年龄" style="max-width:76px">
         <select id="hpSex" class="tsel" style="width:72px;flex:none"><option value="男">男</option><option value="女">女</option></select>
         <select id="hpAct" class="tsel" style="width:104px;flex:none"></select>
+        <select id="hpLoss" class="tsel" style="width:170px;flex:none">
+          <option value="0">维持体重</option>
+          <option value="0.25">每周减 0.25kg · 温和</option>
+          <option value="0.5">每周减 0.5kg · 标准</option>
+          <option value="0.75">每周减 0.75kg · 较快</option>
+          <option value="1">每周减 1kg · 激进</option>
+        </select>
         <button class="btn" data-act="food-profile">保存档案并推荐目标</button>
         <span class="tsmall" id="hpRec"></span>
       </div>
@@ -209,7 +216,7 @@
         <input id="hpTarget" type="number" placeholder="自定义每日目标 kcal(覆盖推荐,留空=用推荐)" style="max-width:280px">
         <button class="btn ghost" data-act="food-target">只改目标</button>
       </div>
-      <div class="footnote">推荐 = (10×体重kg + 6.25×身高cm − 5×年龄 [男+5/女−161]) × 活动系数 − 500;下限 男 1500 / 女 1200 kcal。</div>
+      <div class="footnote">推荐 = BMR(10×体重kg + 6.25×身高cm − 5×年龄 [男+5/女−161]) × 活动系数 − 缺口;缺口 = 每周想减 kg × 1100(1kg 脂肪 ≈ 7700 kcal);下限 男 1500 / 女 1200。</div>
     </div>
   </div>
 

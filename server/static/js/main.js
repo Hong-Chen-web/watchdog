@@ -74,7 +74,8 @@ document.addEventListener('click', ev=>{
   else if (a==='food-profile'){
     fetch('/api/food/profile', {method:'PUT', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({height_cm: $('#hpHeight').value, weight_kg: $('#hpWeight').value,
-                            age: $('#hpAge').value, sex: $('#hpSex').value, activity: $('#hpAct').value})})
+                            age: $('#hpAge').value, sex: $('#hpSex').value, activity: $('#hpAct').value,
+                            weekly_loss: $('#hpLoss').value})})
       .then(async r=>{ const j = await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.detail || ('HTTP '+r.status));
         toast('档案已存 · 推荐每日 '+f0(j.recommended)+' kcal'); return refreshData(); })
       .catch(e=>toast('保存失败:'+e.message)); }

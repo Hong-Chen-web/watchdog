@@ -62,9 +62,9 @@ class TmpDBTestCase(unittest.TestCase):
 
 class PureFunctionsTest(unittest.TestCase):
     def test_recommended_male_sedentary(self):
-        # 男 175/80/30 久坐: BMR=1748.75 TDEE=2098.5 -500=1598.5 → 1600
+        # 男 175/80/30 久坐: BMR=1748.75 TDEE=2098.5 缺口0.5kg×1100=550 → 1548.5 → 1550
         self.assertEqual(food._recommended(
-            {"height_cm": 175, "weight_kg": 80, "age": 30, "sex": "男", "activity": "久坐"}), 1600)
+            {"height_cm": 175, "weight_kg": 80, "age": 30, "sex": "男", "activity": "久坐"}), 1550)
 
     def test_recommended_female_floor(self):
         # 女 160/55/28 轻度: BMR=1249 TDEE=1717.4 -500=1217.4 → floor 1200 生效与否看数值
@@ -77,6 +77,23 @@ class PureFunctionsTest(unittest.TestCase):
         self.assertIsNone(food._recommended({"height_cm": 175}))
         self.assertIsNone(food._recommended({"height_cm": 999, "weight_kg": 80, "age": 30,
                                              "sex": "男"}))
+
+    def test_weekly_loss_goal_variants(self):
+        p = {"height_cm": 175, "weight_kg": 80, "age": 30, "sex": "男", "activity": "久坐"}
+        self.assertEqual(food._recommended(dict(p, weekly_loss=0)), 2100)      # 维持 = TDEE
+        self.assertEqual(food._recommended(dict(p, weekly_loss=0.25)), 1820)   # 温和
+        self.assertEqual(food._recommended(dict(p, weekly_loss=0.5)), 1550)    # 标准(缺省同)
+        self.assertEqual(food._recommended(dict(p, weekly_loss=0.75)), 1500)   # 触底保护
+        self.assertEqual(food._recommended(dict(p, weekly_loss=2)), 1500)      # 越界收敛到 1kg/周
+
+    def test_breakdown_mode(self):
+        bd = food._recommended({"height_cm": 175, "weight_kg": 80, "age": 30, "sex": "男",
+                                "activity": "久坐", "weekly_loss": 0.5}, breakdown=True)
+        self.assertEqual(bd["recommended"], 1550)
+        self.assertEqual(bd["bmr"], 1749)          # 800+1093.75-150+5
+        self.assertEqual(bd["tdee"], 2098)         # 1748.75×1.2(round-half-even)
+        self.assertEqual(bd["deficit"], 550)       # 0.5kg × 1100
+        self.assertFalse(bd["floored"])
 
     def test_meal_auto_by_hour(self):
         self.assertEqual(food._meal_auto(datetime(2026, 10, 20, 8, 0)), "早餐")
@@ -145,16 +162,16 @@ class FoodCrudTest(TmpDBTestCase):
     def test_profile_and_target(self):
         r = food.food_profile({"height_cm": 175, "weight_kg": 80, "age": 30,
                                "sex": "男", "activity": "久坐"})
-        self.assertEqual(r["recommended"], 1600)
-        self.assertEqual(r["target"], 1600)            # 未设自定义 → 推荐
+        self.assertEqual(r["recommended"], 1550)
+        self.assertEqual(r["target"], 1550)            # 未设自定义 → 推荐
         t = food.food_target({"kcal": 1800})
         self.assertEqual(t["target"], 1800)
         r2 = food.food_profile({"height_cm": 175, "weight_kg": 78, "age": 30,
-                                "sex": "男", "activity": "久坐"})
+                                "sex": "男", "activity": "久坐", "weekly_loss": 0.25})
+        self.assertEqual(r2["recommended"], 1800)      # BMR1728.75×1.2=2074.5 − 275 = 1799.5 → 1800
         self.assertEqual(r2["target"], 1800)           # 重新保存档案保留自定义目标
         t2 = food.food_target({"kcal": None})          # 清掉自定义 → 回推荐
-        self.assertEqual(t2["target"], food._recommended(
-            {"height_cm": 175, "weight_kg": 78, "age": 30, "sex": "男", "activity": "久坐"}))
+        self.assertEqual(t2["target"], r2["recommended"])
         with self.assertRaises(HTTPException):
             food.food_target({"kcal": 99999})
         with self.assertRaises(HTTPException):

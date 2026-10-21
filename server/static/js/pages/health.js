@@ -45,8 +45,12 @@ function renderHealth(){
   if (fills.every(x=>!$(x[0]).value)) fills.forEach(x=>{ if (x[1] != null) $(x[0]).value = x[1]; });
   if (p.sex) $('#hpSex').value = p.sex;
   if (p.activity) $('#hpAct').value = p.activity;
-  $('#hpRec').textContent = f.recommended ? ('按档案推荐 ' + f0(f.recommended) + ' kcal/日' + (prof.target_kcal ? '(已自定义 '+f0(target)+')' : ''))
-    : '填好身高/体重/年龄后自动推荐';
+  $('#hpLoss').value = String(p.weekly_loss != null ? p.weekly_loss : 0.5);   // 与后端缺省一致
+  const bd = f.breakdown;
+  $('#hpRec').textContent = !f.recommended ? '填好身高/体重/年龄后自动推荐'
+    : '推荐 ' + f0(f.recommended) + ' kcal/日 · BMR ' + f0(bd.bmr) + ' · TDEE ' + f0(bd.tdee)
+      + ' − 缺口 ' + f0(bd.deficit) + '(每周 −' + bd.weekly_loss + 'kg)'
+      + (bd.floored ? ' · 已按安全下限托底' : '') + (prof.target_kcal ? ' · 已自定义 ' + f0(target) : '');
 
   $('#sfTag').textContent = hhmm(lastUpdate);
   $('#sideFoodBody').innerHTML =

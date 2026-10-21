@@ -18,6 +18,9 @@ router = APIRouter(prefix="/api/food", tags=["food"])
 MEALS = ["早餐", "午餐", "晚餐", "加餐"]
 # Mifflin-St Jeor 活动系数
 ACTIVITY = {"久坐": 1.2, "轻度活动": 1.375, "中度活动": 1.55, "高强度": 1.725}
+# 每周想减 kg → 每日缺口(kcal)。1kg 脂肪 ≈ 7700 kcal → 每天缺口 = 每周 kg × 1100
+LOSS_OPTIONS = {"维持体重": 0.0, "温和 −0.25kg/周": 0.25, "标准 −0.5kg/周": 0.5,
+                "较快 −0.75kg/周": 0.75, "激进 −1kg/周": 1.0}
 PROFILE_KEY = "health_profile"
 
 
@@ -35,8 +38,11 @@ def _meal_auto(now: datetime = None) -> str:
     return "加餐"
 
 
-def _recommended(p: dict) -> int | None:
-    """按身高体重年龄性别活动量推荐每日摄入(Mifflin-St Jeor,减脂缺口 500)。档案不全返回 None。"""
+def _recommended(p: dict, breakdown: bool = False):
+    """按身高体重年龄性别活动量推荐每日摄入。档案不全返回 None。
+
+    推荐 = BMR(Mifflin-St Jeor) × 活动系数 − 缺口;缺口 = 每周想减 kg × 1100
+    (1kg 脂肪 ≈ 7700 kcal),weekly_loss 缺省 0.5;下限 男1500/女1200。"""
     try:
         w = float(p["weight_kg"]); h = float(p["height_cm"]); a = float(p["age"])
         sex = p.get("sex")
@@ -46,9 +52,19 @@ def _recommended(p: dict) -> int | None:
         return None
     bmr = 10 * w + 6.25 * h - 5 * a + (5 if sex == "男" else -161)
     tdee = bmr * ACTIVITY.get(p.get("activity") or "久坐", 1.2)
-    target = tdee - 500                      # 约每周 -0.5kg 的温和缺口
+    try:
+        loss = min(1.0, max(0.0, float(p.get("weekly_loss", 0.5))))
+    except (TypeError, ValueError):
+        loss = 0.5
+    deficit = loss * 1100
+    target = tdee - deficit
     floor = 1200 if sex == "女" else 1500    # 不低于基础代谢安全线
-    return int(round(max(floor, target) / 10) * 10)
+    rec = int(round(max(floor, target) / 10) * 10)
+    if breakdown:
+        return {"recommended": rec, "bmr": round(bmr), "tdee": round(tdee),
+                "deficit": round(deficit), "weekly_loss": loss,
+                "floored": target < floor}
+    return rec
 
 
 def _clean_items(items) -> list:
@@ -87,7 +103,7 @@ def _put_profile(conn, p: dict):
 
 @router.put("/profile")
 def food_profile(body: dict = None):
-    """保存身体档案;target_kcal 缺省=按档案推荐,显式给出则覆盖(未给出保留旧目标)。"""
+    """保存身体档案;weekly_loss=每周想减 kg(缺省沿用旧值/0.5);target_kcal 显式给出则覆盖目标。"""
     b = body or {}
     try:
         p = {"height_cm": float(b["height_cm"]), "weight_kg": float(b["weight_kg"]),
@@ -100,6 +116,13 @@ def food_profile(body: dict = None):
     conn = get_conn()
     try:
         old = _get_profile(conn)
+        if b.get("weekly_loss") not in (None, ""):
+            try:
+                p["weekly_loss"] = min(1.0, max(0.0, float(b["weekly_loss"])))
+            except (TypeError, ValueError):
+                raise HTTPException(400, "每周想减 kg 要是数字")
+        elif "weekly_loss" in old:
+            p["weekly_loss"] = old["weekly_loss"]
         if b.get("target_kcal") not in (None, ""):
             try:
                 tk = int(float(b["target_kcal"]))
@@ -114,7 +137,7 @@ def food_profile(body: dict = None):
         conn.commit()
     finally:
         conn.close()
-    return {"ok": True, "profile": p, "recommended": _recommended(p),
+    return {"ok": True, "profile": p, **(_recommended(p, breakdown=True) or {}),
             "target": p.get("target_kcal") or _recommended(p)}
 
 
@@ -206,6 +229,7 @@ def food_overview(days: int = 7):
                     for i in range(n)]
         return {"today": today, "target": target, "recommended": rec, "profile": p,
                 "meals": MEALS, "activity": ACTIVITY,
+                "breakdown": _recommended(p, breakdown=True),
                 "total": round(sum(r["kcal"] or 0 for r in rows)),
                 "entries": rows, "days": day_list}
     finally:
