@@ -50,23 +50,30 @@ document.addEventListener('click', ev=>{
       .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); $('#newTodo').value=''; return refreshData(); })
       .then(()=>{ navigate('time'); toast('待办已写入'); })
       .catch(()=>toast('写入失败:后端不可达')); }
-  else if (a==='food-ai'){ const t=$('#foodText').value.trim(); if(!t) return;
-    el.disabled = true;
+  else if (a==='meal-pick'){ S.foodMeal = el.dataset.meal; renderHealth(); }
+  else if (a==='meal-add'){ S.foodMeal = el.dataset.meal; renderHealth(); const i=$('#foodText'); if(i) i.focus(); }
+  else if (a==='food-manual'){ const box=$('#fdManual'); if(!box) return;
+    box.hidden = !box.hidden;
+    $('#fdManualBtn').textContent = box.hidden ? '手动填热量' : '收起手动输入';
+    if(!box.hidden) $('#foodName').focus(); }
+  else if (a==='food-ai'){ const t=$('#foodText').value.trim(); if(!t){ toast('先写吃了什么,比如:两个包子一碗粥'); return; }
+    const old = el.innerHTML;
+    el.disabled = true; el.textContent = 'AI 估算中…';
     fetch('/api/food', {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({text: t, meal: $('#foodMeal').value || ''})})
+      body: JSON.stringify({text: t, meal: S.foodMeal || ''})})
       .then(async r=>{ const j = await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.detail || ('HTTP '+r.status));
         $('#foodText').value = '';
-        toast('已记 '+j.items.length+' 条 · 合计 '+f0(j.total)+' kcal(估算)'); return refreshData(); })
+        toast('已记 '+j.items.length+' 条 · 合计 '+f0(j.total)+' kcal(估算)','acc'); return refreshData(); })
       .catch(e=>toast('AI 记录失败:'+e.message))
-      .finally(()=>{ el.disabled = false; }); }
+      .finally(()=>{ el.disabled = false; el.innerHTML = old; }); }
   else if (a==='food-add'){ const food = $('#foodName').value.trim(); if(!food){ toast('填一下食物名'); return; }
     fetch('/api/food', {method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({food: food, portion: $('#foodPortion').value.trim(),
                             kcal: $('#foodKcal').value === '' ? null : $('#foodKcal').value,
-                            meal: $('#foodMeal').value || ''})})
+                            meal: S.foodMeal || ''})})
       .then(async r=>{ const j = await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.detail || ('HTTP '+r.status));
         $('#foodName').value = $('#foodPortion').value = $('#foodKcal').value = '';
-        toast('已记录'); return refreshData(); })
+        toast('已记录 · '+f0(j.total)+' kcal'); return refreshData(); })
       .catch(e=>toast('记录失败:'+e.message)); }
   else if (a==='food-del'){ fetch('/api/food/'+el.dataset.id, {method:'DELETE'})
       .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return refreshData(); })

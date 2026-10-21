@@ -39,8 +39,18 @@ html[data-theme="dark"] .row-hover:hover,html[data-theme="dark"] .push-row:hover
 html[data-theme="dark"] .td-row:hover,html[data-theme="dark"] .cal-day:hover{background:rgba(101,178,246,.10)}
 html[data-theme="dark"] .srch{background:rgba(101,178,246,.10);border-color:rgba(101,178,246,.30)}
 html[data-theme="dark"] .addbox input{background:rgba(101,178,246,.10);border-color:rgba(101,178,246,.30)}
-html[data-theme="dark"] .fprog{background:rgba(255,255,255,.08)}
-html[data-theme="dark"] .fdel:hover{background:rgba(255,90,95,.18)}
+html[data-theme="dark"] .fd-track{stroke:rgba(255,255,255,.08)}
+html[data-theme="dark"] .fd-stat{background:rgba(255,255,255,.05)}
+html[data-theme="dark"] .fd-ringmid span{background:rgba(255,255,255,.07)}
+html[data-theme="dark"] .fd-mic{background:rgba(255,255,255,.07)}
+html[data-theme="dark"] .fd-add input{background:rgba(101,178,246,.10);border-color:rgba(101,178,246,.30);color:var(--ink)}
+html[data-theme="dark"] .fd-manual input{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.10);color:var(--ink)}
+html[data-theme="dark"] .fd-rec{background:linear-gradient(160deg,rgba(255,180,107,.10),rgba(232,84,138,.12));border-color:rgba(232,84,138,.22)}
+html[data-theme="dark"] .fd-field input,html[data-theme="dark"] .fd-field select{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.10);color:var(--ink)}
+html[data-theme="dark"] .fd-field select option{background:#1A222E;color:var(--ink)}
+html[data-theme="dark"] .fd-targetrow input{background:rgba(255,255,255,.05);color:var(--ink)}
+html[data-theme="dark"] .fbcol:before{background:rgba(255,255,255,.045)}
+html[data-theme="dark"] .fd-goalchip{color:#FF9DBE}
 html[data-theme="dark"] .tip{background:#1E2734;border-color:rgba(255,255,255,.08)}
 html[data-theme="dark"] .toast{background:#212B3A;box-shadow:0 26px 56px -24px rgba(0,0,0,.7)}
 html[data-theme="dark"] .dd-menu{background:#1E2734;border:1px solid rgba(255,255,255,.08)}

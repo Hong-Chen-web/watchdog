@@ -171,52 +171,92 @@
 
   <!-- ===== 健康 ===== -->
   <div class="page" id="page-health">
-    <div class="card">
-      <div class="chead"><b>今日饮食</b><span class="tagsm" id="foodStat"></span>
-        <div class="r"><span class="tsmall" id="foodTargetTag"></span></div></div>
-      <div class="fprog"><i id="foodBar"></i></div>
-      <div id="foodBody"></div>
-      <div class="addbox">
-        <select id="foodMeal" class="tsel" style="width:78px;flex:none"></select>
-        <input id="foodText" placeholder="吃了什么?如:两个包子 一碗粥 一杯牛奶(回车 AI 估热量)" autocomplete="off">
-        <button class="btn" data-act="food-ai">AI 估热量记录</button>
+    <div class="card fd-hero" id="fdHero">
+      <div class="fd-ringwrap">
+        <svg viewBox="0 0 168 168" class="fd-ring" aria-hidden="true">
+          <defs>
+            <linearGradient id="fdGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#FFB46B"/><stop offset="100%" stop-color="#E8548A"/>
+            </linearGradient>
+          </defs>
+          <circle class="fd-track" cx="84" cy="84" r="70"/>
+          <circle class="fd-arc" id="fdArc" cx="84" cy="84" r="70" transform="rotate(-90 84 84)"/>
+        </svg>
+        <div class="fd-ringmid">
+          <b id="fdEat">0</b>
+          <small>kcal 已摄入</small>
+          <span id="fdGoalSm">目标 —</span>
+        </div>
       </div>
-      <div class="addbox">
-        <input id="foodName" placeholder="食物名(手动)" style="max-width:200px" autocomplete="off">
-        <input id="foodPortion" placeholder="份量,如 1碗" style="max-width:110px" autocomplete="off">
-        <input id="foodKcal" type="number" placeholder="千卡" style="max-width:96px" autocomplete="off">
-        <button class="btn ghost" data-act="food-add">手动记录</button>
+      <div class="fd-herobody">
+        <div class="fd-hi">
+          <div>
+            <span class="fd-overline">TODAY · 今日饮食</span>
+            <h2 id="fdHeadline">今天还没记录</h2>
+            <p id="fdSubline">一句话写下吃了什么,AI 帮你估热量</p>
+          </div>
+          <span class="fd-goalchip" id="fdGoalChip">—</span>
+        </div>
+        <div class="fd-stats">
+          <div class="fd-stat"><small>还可吃</small><b id="fdRemain">—</b><span id="fdRemainNote">kcal</span></div>
+          <div class="fd-stat"><small>维持体重</small><b id="fdTdee">—</b><span>TDEE kcal</span></div>
+          <div class="fd-stat"><small>今日记录</small><b id="fdCount">0</b><span id="fdMealCount">还没开张</span></div>
+        </div>
       </div>
-      <div class="footnote">热量为估算值只做参考;点行末 × 删除。AI 依赖「系统 · 大模型」配置。</div>
     </div>
+
     <div class="card">
-      <div class="chead"><b>近 7 天趋势</b><span class="tagsm" id="foodWeekTag"></span></div>
+      <div class="chead"><b>记一笔</b><span class="tagsm" id="foodStat"></span></div>
+      <div class="fd-mealbar">
+        <div class="seg" id="fdMealSeg"></div>
+        <span class="fd-manual-toggle" data-act="food-manual" id="fdManualBtn">手动填热量</span>
+      </div>
+      <div class="fd-add">
+        <input id="foodText" placeholder="例如:两个包子 一碗粥 一杯牛奶(回车提交)" autocomplete="off">
+        <button class="btn fd-ai" data-act="food-ai">✨ AI 估算</button>
+      </div>
+      <div class="fd-manual" id="fdManual" hidden>
+        <input id="foodName" placeholder="食物名" autocomplete="off">
+        <input id="foodPortion" placeholder="份量,如 1 碗" autocomplete="off">
+        <input id="foodKcal" type="number" placeholder="千卡(可空)" autocomplete="off">
+        <button class="btn ghost" data-act="food-add">记录</button>
+      </div>
+      <div id="foodBody" class="fd-meals"></div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><b>近 7 天</b><span class="tagsm" id="foodWeekTag"></span>
+        <div class="r"><span class="tsmall" id="fdWeekAvg"></span></div></div>
       <div class="fbars" id="foodBars"></div>
-      <div class="footnote">柱 = 当日合计千卡;虚线 = 每日目标;红柱 = 超标。</div>
+      <div class="fbx" id="foodDates"></div>
     </div>
-    <div class="card">
-      <div class="chead"><b>身体档案 · 每日热量目标</b><span class="tagsm">Mifflin-St Jeor × 活动系数 − 500(约每周 −0.5kg)</span></div>
-      <div class="addbox" style="flex-wrap:wrap">
-        <input id="hpHeight" type="number" placeholder="身高 cm" style="max-width:96px">
-        <input id="hpWeight" type="number" placeholder="体重 kg" style="max-width:96px">
-        <input id="hpAge" type="number" placeholder="年龄" style="max-width:76px">
-        <select id="hpSex" class="tsel" style="width:72px;flex:none"><option value="男">男</option><option value="女">女</option></select>
-        <select id="hpAct" class="tsel" style="width:104px;flex:none"></select>
-        <select id="hpLoss" class="tsel" style="width:170px;flex:none">
+
+    <div class="card fd-profile">
+      <div class="chead fd-phead"><b>身体档案</b><span class="tagsm">目标按身高体重推荐,可随时调整</span></div>
+      <div class="fd-fields">
+        <label class="fd-field"><span>身高 cm</span><input id="hpHeight" type="number" autocomplete="off"></label>
+        <label class="fd-field"><span>体重 kg</span><input id="hpWeight" type="number" autocomplete="off"></label>
+        <label class="fd-field"><span>年龄</span><input id="hpAge" type="number" autocomplete="off"></label>
+        <label class="fd-field"><span>性别</span><select id="hpSex"><option value="男">男</option><option value="女">女</option></select></label>
+        <label class="fd-field"><span>活动量</span><select id="hpAct"></select></label>
+        <label class="fd-field"><span>每周想减</span><select id="hpLoss">
           <option value="0">维持体重</option>
-          <option value="0.25">每周减 0.25kg · 温和</option>
-          <option value="0.5">每周减 0.5kg · 标准</option>
-          <option value="0.75">每周减 0.75kg · 较快</option>
-          <option value="1">每周减 1kg · 激进</option>
-        </select>
-        <button class="btn" data-act="food-profile">保存档案并推荐目标</button>
-        <span class="tsmall" id="hpRec"></span>
+          <option value="0.25">0.25 kg · 温和</option>
+          <option value="0.5">0.5 kg · 标准</option>
+          <option value="0.75">0.75 kg · 较快</option>
+          <option value="1">1 kg · 激进</option>
+        </select></label>
+        <button class="btn" data-act="food-profile">保存并推荐目标</button>
       </div>
-      <div class="addbox">
-        <input id="hpTarget" type="number" placeholder="自定义每日目标 kcal(覆盖推荐,留空=用推荐)" style="max-width:280px">
-        <button class="btn ghost" data-act="food-target">只改目标</button>
-      </div>
-      <div class="footnote">推荐 = BMR(10×体重kg + 6.25×身高cm − 5×年龄 [男+5/女−161]) × 活动系数 − 缺口;缺口 = 每周想减 kg × 1100(1kg 脂肪 ≈ 7700 kcal);下限 男 1500 / 女 1200。</div>
+      <aside class="fd-rec">
+        <small>推荐每日摄入</small>
+        <div class="fd-big"><b id="fdRecBig">—</b><span>kcal</span></div>
+        <div class="fd-recmath" id="hpRec">填好档案后自动计算</div>
+        <div class="fd-targetrow">
+          <input id="hpTarget" type="number" placeholder="自定义目标,留空回推荐" autocomplete="off">
+          <button class="btn ghost" data-act="food-target">应用</button>
+        </div>
+      </aside>
     </div>
   </div>
 

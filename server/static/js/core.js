@@ -124,7 +124,7 @@ function calPush(d, ev){ (calMap[d] = calMap[d] || {trades:[],spend:0,spendList:
 const S = { page:'today', tradeSeg:'hold', range:'all', watchQ:'', calSel:null, tradeRange:'10',
             month:null, cat:'全部', lvStock:null, lvFut:null, scanSim:false,
             blind: localStorage.getItem('wd-blind')==='1', pushMaster:null, pushOpen:false, poolOpen:false,
-            aiOpen:false, aiIntent:null, aiLog:[], aiBusy:false };
+            aiOpen:false, aiIntent:null, aiLog:[], aiBusy:false, foodMeal:'' };
 
 /* ---------- Toast ---------- */
 function toast(msg, acc){ const t = document.createElement('div'); t.className = 'toast' + (acc?' acc':'');
