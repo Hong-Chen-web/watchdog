@@ -704,6 +704,7 @@ def settle_all():
             if exit_why:
                 s["_exit_why"] = f"{exit_why}({today['date']})"
                 s["_exit_px"] = today["close"]
+                s.pop("_hold_note", None)      # 出场后不留“持有中(第N/3日)”旧备注
                 cool[code6] = today["date"]
                 changed = True
                 settled.append({"date": r["date"], "name": s["name"], "why": exit_why,
