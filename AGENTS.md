@@ -70,7 +70,7 @@ pkill -x Watchdog        # 守护自动重启 App→新 sidecar;WebView 重载 /
 ## 5. 数据源纪律(用户明令:腾讯优先)
 
 - **清单/K线/快照=腾讯**(qt.gtimg.cn / ifzq.gtimg.cn),**行业分类=新浪**(腾讯无公开成员接口),**东财只剩一处**:条件⑥主力净占比(fflow daykline 的 p[6]=f57,**永久缓存 data/fflow_cache.json 每票每涨停日只拉一次**)。禁止新增东财依赖。
-- **一切出网必须绕 Clash 代理**(代理 127.0.0.1:7897 常挂):requests 用 `sess.trust_env=False`;urllib 用 `build_opener(ProxyHandler({}))`;git push 必须加三旗标 `-c http.proxy= -c https.proxy= -c http.https://github.com.proxy=`;推送卡死多半是 osxkeychain 凭据助手挂起(本仓库已本地切 `credential.helper=!gh auth git-credential`),github 直连时好时坏属常态,重试或走 gh 通道
+- **一切出网必须绕 Clash 代理**(代理 127.0.0.1:7897 常挂):requests 用 `sess.trust_env=False`(统一走 `services.net.session()`);urllib 用 `build_opener(ProxyHandler({}))`——**`main.py` 启动即 `net.install()` 装空代理默认 opener**:urllib 模块级 opener 在首次调用时**固化当时的系统代理**,App 长活、Clash 一挂,进程内所有请求 ECONNREFUSED(2026-10-21 行情/选股/飞书同时哑,外部 curl 正常);git push 必须加三旗标 `-c http.proxy= -c https.proxy= -c http.https://github.com.proxy=`;推送卡死多半是 osxkeychain 凭据助手挂起(本仓库已本地切 `credential.helper=!gh auth git-credential`),github 直连时好时坏属常态,重试或走 gh 通道
 - 腾讯指数K线(ifzq)已 501——交易日历用**库内大票日期序列**(selection._index_trade_days)
 
 ## 6. 十大坑(踩过,N 次复发的已标★)

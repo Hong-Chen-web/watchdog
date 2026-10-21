@@ -511,6 +511,9 @@ def run_selection(archive: bool = True):
     archive=True(14:55 自动跑):写名单+建轮档案(进台账/持仓生命周期)。"""
     global _ZT_TODAY
     out = []
+    stale = 0
+    today_s = date.today().strftime("%Y-%m-%d")
+    require_today = _require_today_bar()
     pool = universe()
     zt_today = set()
     try:
@@ -522,6 +525,8 @@ def run_selection(archive: bool = True):
     except Exception:
         snap = {}
     _ZT_TODAY = zt_today
+    if require_today and not snap:
+        raise RuntimeError("当日行情快照为空:中止选股(不拿昨日数据充当日)")
     # 近10交易日涨停滚动集预筛(只评估涨停过的票;拿不到日历→全池,不误杀)
     try:
         cand = _roll_candidates(zt_today, date.today().strftime("%Y-%m-%d"))
@@ -548,6 +553,9 @@ def run_selection(archive: bool = True):
         k = tencent_daily(code6, 120)
         if not k:
             continue
+        if require_today and k[-1]["date"] < today_s:
+            stale += 1
+            continue
         if _in_cooldown(code6, k):
             continue
         r = score_stock(code6, k, name)
@@ -557,6 +565,8 @@ def run_selection(archive: bool = True):
         # K线库命中(无网络IO)不节流;未命中走了网络才 sleep 防限流
         if not kline_hit:
             time.sleep(0.25)
+    if stale and not out:
+        raise RuntimeError(f"{stale} 只均缺当日行情:中止选股(不拿昨日数据充当日)")
     out.sort(key=lambda x: -x["score"])
     top = out[:10]
 
@@ -643,6 +653,8 @@ def settle_all():
     failed = []
     cool = _cooldown_map()
     changed = False
+    today_s = date.today().strftime("%Y-%m-%d")
+    require_today = _require_today_bar()
     for r in d.get("rounds", []):
         if r.get("settled"):
             continue
@@ -656,6 +668,10 @@ def settle_all():
             k = tencent_daily(code6, 15)
             if not k:
                 failed.append(f"{s['name']}(K线源失败)")
+                continue
+            if require_today and k[-1]["date"] < today_s:
+                # 当日快照缺失(断网/停牌):绝不拿昨日K线当今日评估,持仓原样保留
+                failed.append(f"{s['name']}(当日行情缺失,未评估)")
                 continue
             today, prev = k[-1], k[-2]["close"]
             if today["date"] <= r["date"]:      # 买入当日不评估
@@ -751,6 +767,15 @@ def _is_trade_day() -> bool:
         return datetime.now().weekday() < 5
 
 
+def _require_today_bar() -> bool:
+    """结算/选股是否必须拿到“今天”的K线:交易日 09:30 后(含盘后)一律要求。
+
+    2026-10-21 事故:断网时当日快照失败,日K只到昨天,结算把昨天当今天
+    (第3/3日卖出被算成第2/3日持有),选股也拿昨收当现价——必须显式中止。
+    """
+    return _is_trade_day() and datetime.now().strftime("%H:%M") >= "09:30"
+
+
 SCHED_MARK = DATA / "selection_sched.json"   # 仅调度器写;手动跑不写→不抑制14:55官方跑
 
 
@@ -786,6 +811,10 @@ def start_scheduler():
                 if (_is_trade_day() and not _ran_today(day) and hm >= "14:55"):
                     caught_up = hm >= "15:05"
                     r = settle_all()
+                    if r.get("failed") and hm < "15:30":
+                        print(f"[watchdog] 结算未完成({len(r['failed'])}只),60s 后重试", flush=True)
+                        time.sleep(60)
+                        continue
                     picks = run_selection(archive=True)
                     try:
                         SCHED_MARK.write_text(json.dumps(
@@ -829,6 +858,12 @@ def start_scheduler():
                                     f"plan:{day2}",
                                     rows=[{"股票": b["name"], "买价(锁定)": f"**{b['buy_price']}**"} for b in buys],
                                     footer="持仓上限3只(可买=空位数) · 选股日收盘价买入 · 次一交易日起评估出场")
+                        fails = r.get("failed") or []
+                        if fails:
+                            ensure_push("settle", f"⚠️ 结算未完成 · {len(fails)}只", "",
+                                f"settle_fail:{day2}",
+                                rows=[{"标的": f, "处理": "未评估 · 持仓不动"} for f in fails],
+                                footer="当日行情缺失/停牌 · 下个交易日继续")
                     except Exception as e:
                         print("[watchdog] push hook:", e)
             except Exception as e:

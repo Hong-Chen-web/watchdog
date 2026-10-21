@@ -57,8 +57,8 @@ def ask(text: str) -> dict:
         "- watchlist {} 自选行情; - futures {} 期货监控; - push_today {} 今日飞书推送; - goals {} 目标。"
         "相对时间按今天换算。当前持仓:" + hold_ctx + "。当前自选:" + wl_ctx + "。只输出 JSON。")
 
-    import requests as _rq
-    r = _rq.post(f"{str(base).rstrip('/')}/chat/completions",
+    from services import net as _net
+    r = _net.session().post(f"{str(base).rstrip('/')}/chat/completions",
                  headers={"Authorization": f"Bearer {key}"},
                  json={"model": model or "deepseek-chat",
                        "messages": [{"role": "system", "content": sys_prompt},

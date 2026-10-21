@@ -74,6 +74,24 @@
 | test_empty_ledger | 空台账 → 空曲线 |
 | test_no_duplicate_dates | 绝不出现重复日期点(旧实现「最近一日」恒 0.00% 的根因) |
 
+**test_net_proxy.py — 出网代理纪律**
+
+| 用例 | 守什么 |
+|---|---|
+| test_opener_has_empty_proxy | 默认 opener 不挂任何代理(不读系统/环境代理) |
+| test_install_ignores_dead_env_proxy | 环境塞死代理 + install() 后仍直连成功(2026-10-21 事故复现防线) |
+| test_requests_session_trust_env_off | requests 统一入口 trust_env=False、无代理 |
+| test_main_installs_before_startup | main.py 在启动链路最先安装空代理 opener |
+
+**test_selection_guard.py — 当日行情缺失防线**
+
+| 用例 | 守什么 |
+|---|---|
+| test_stale_bar_does_not_touch_position | 缺当日K线:结算记 failed,绝不写「第N/3日持有」或出场 |
+| test_fresh_bar_still_evaluates | 当日K线在:防线不误伤,照常完成评估 |
+| test_empty_snapshot_aborts | 当日快照为空:选股中止(不落空名单) |
+| test_stale_candidates_abort | 候选日K全停在昨天:选股中止,不拿昨收入榜 |
+
 **test_food.py — 健康页 /api/food**
 
 | 用例 | 守什么 |
@@ -146,6 +164,8 @@
 | 2026-10-20 | 本批 | live 刷新链无隔离:渲染前任一异常(如 D.feishu 缺失)让 3s 轮询"请求照发、整页不重绘",看着像数据不刷新且无从判断 | 注入复现(feishu 缺失+total 篡改)→ 3s 内自愈回 85,965;页头新增「· 行情 HH:MM」新鲜度 |
 | 2026-10-20 | 本批 | 新功能:健康页(饮食明细 + AI 估热量 + 身高体重推荐目标),迁移 v27(food_entries + 模块 food) | test_food 11 例全绿;实操:AI「两个包子一碗粥」拆 3 条 660 kcal,手动/删除/档案/目标/7 天趋势全点过;tier2 20 项 |
 | 2026-10-21 | 本批 | 健康页 UI 重构(对齐 Lifesum/Yazio 的信息层级):环形热量 hero、餐次分组、折叠手动输入、趋势柱背景槽、档案推荐面板;修折叠按钮与餐次分段重叠、目标标签压住「有记录」、零值柱残留 | 浅色/深色/1080 窄屏截图逐张目检;浏览器实操:餐次切换→手动记 100 kcal(落晚餐)→删除还原;点空餐次行切餐并聚焦;42 例单测 + tier2 20 项全绿 |
+| 2026-10-21 | 本批 | **实盘事故**:App 进程 urllib 默认 opener 在启动时(Clash 开着)固化系统代理 127.0.0.1:7897,代理 12:20 挂掉后进程内行情/选股/飞书全部 ECONNREFUSED(外部 curl 正常);14:55 持仓卡+选股卡推送失败 | test_net_proxy 4 例(含死代理环境直连);重启后行情 12:20 恢复 15:29、fails 归零;补发 444/445 → sent |
+| 2026-10-21 | 本批 | 同日连带:断网时当日快照失败,日K只到昨天,结算把「第3/3日卖出」算成「第2/3日持有」,选股拿 10-20 收盘当现价(选股卡 6 只全为旧数据) | test_selection_guard 4 例;16:08 用真实收盘数据手动重跑 → 真实候选 1 只(吉视传媒 2.47),证实 14:55 卡片为昨日数据 |
 
 ## 5. 后续补测(已知缺口)
 

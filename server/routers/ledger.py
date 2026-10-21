@@ -324,7 +324,6 @@ def smart_any(body: dict):
 
     def _llm_parse():
         import json as _json
-        import requests
         from datetime import date as _d
         today = _d.today()
         ctx_wl = ""
@@ -351,7 +350,8 @@ def smart_any(body: dict):
             "操作指令只在用户明确要求改动时输出;自选操作优先用用户给的代码,"
             "只给名字时从当前自选清单映射 code,清单里没有则 code=null 并填 name。" + ctx_wl +
             " 用户说『不用记/别记』的条目直接忽略不要输出。只输出 JSON 数组。")
-        r = requests.post(
+        from services import net as _net
+        r = _net.session().post(
             f"{llm_base.rstrip('/')}/chat/completions",
             headers={"Authorization": f"Bearer {llm_key}"},
             json={"model": llm_model or "deepseek-chat",

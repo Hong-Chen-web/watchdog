@@ -40,7 +40,7 @@ def put_llm(body: LLMPayload):
 @router.post("/test")
 def test_llm(body: LLMPayload = None):
     """连通性测试:body 带未保存的值则直接测之,否则用当前生效配置。"""
-    import requests
+    from services import net as _net
     if body and (body.base.strip() or body.key.strip()):
         base = body.base.strip().rstrip("/")
         key, model = body.key.strip(), body.model.strip() or "deepseek-chat"
@@ -51,7 +51,7 @@ def test_llm(body: LLMPayload = None):
     if not base or not key:
         return {"ok": False, "error": "未配置接口地址或 API Key"}
     try:
-        r = requests.post(
+        r = _net.session().post(
             f"{base}/chat/completions",
             headers={"Authorization": f"Bearer {key}"},
             json={"model": model, "messages": [{"role": "user", "content": "回复OK"}],

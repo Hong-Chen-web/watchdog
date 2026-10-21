@@ -11,6 +11,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+from services import net
+net.install()         # 必须最先:urllib 默认 opener 固化启动时代理,Clash 一挂全进程出网瘫痪
+
 from services.czsc_light import ensure_light_czsc
 ensure_light_czsc()   # 必须最先:轻量 czsc 壳顶替 fat 包入口(wbt/polars/pyarrow 永不加载)
 
