@@ -456,7 +456,7 @@ def _index_trade_days(n=11):
 
 
 def _roll_rebuild(w10):
-    """全池扫库重建近10交易日涨停图(仅断档时,~1分钟,一次性)。"""
+    """全池扫库重建近10交易日涨停图(纯库内扫描,~1分钟;每天首跑重建)。"""
     from services import kline_store as _ks
     wset, codes = set(w10), {}
     for code6, _n in universe():
@@ -484,7 +484,9 @@ def _roll_candidates(zt_today, today):
         roll = json.loads(ROLL.read_text())
     except Exception:
         roll = {}
-    if not roll or roll.get("through") != win[-2]:   # 断档→全池重建
+    # 每天首跑一律从库内重建(增量文件会漏票:2026-10-22 佳力奇 10-16 涨停从未入册,
+    # 官方 14:55 只评估了 37 只候选漏扫;重建是纯库内扫描 ~1 分钟,当日后续跑跳过)
+    if not roll or roll.get("through") != today:
         roll = _roll_rebuild(win[-10:])
     codes = roll.setdefault("codes", {})
     for c in list(codes):                     # 清窗口外日期

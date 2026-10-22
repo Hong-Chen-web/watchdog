@@ -81,7 +81,9 @@ class SettleStaleBarTest(unittest.TestCase):
 
 class SelectionStaleGuardTest(unittest.TestCase):
     def test_empty_snapshot_aborts(self):
-        with mock.patch.object(sel, "universe", return_value=[("600000", "浦发银行")]), \
+        tmp = Path(tempfile.mkdtemp(prefix="wd_seldata_"))
+        with mock.patch.object(sel, "DATA", tmp), \
+             mock.patch.object(sel, "universe", return_value=[("600000", "浦发银行")]), \
              mock.patch.object(sel, "_require_today_bar", return_value=True), \
              mock.patch("services.kline_store.snapshot_today_bars", return_value={}):
             with self.assertRaises(RuntimeError) as ctx:
@@ -92,8 +94,11 @@ class SelectionStaleGuardTest(unittest.TestCase):
         """快照有值但每只票的日K都停在昨天 → 不许拿昨收入榜。"""
         bars = [{"date": (date.today() - timedelta(days=1)).strftime("%Y-%m-%d"),
                  "close": 5.0}]
-        with mock.patch.object(sel, "universe", return_value=[("600000", "浦发银行")]), \
+        tmp = Path(tempfile.mkdtemp(prefix="wd_seldata_"))
+        with mock.patch.object(sel, "DATA", tmp), \
+             mock.patch.object(sel, "universe", return_value=[("600000", "浦发银行")]), \
              mock.patch.object(sel, "_require_today_bar", return_value=True), \
+             mock.patch.object(sel, "_roll_candidates", return_value={"600000"}), \
              mock.patch("services.kline_store.snapshot_today_bars",
                         return_value={"600000": {"date": date.today().strftime("%Y-%m-%d"),
                                                  "close": 5.0}}), \
@@ -101,6 +106,37 @@ class SelectionStaleGuardTest(unittest.TestCase):
             with self.assertRaises(RuntimeError) as ctx:
                 sel.run_selection(archive=False)
         self.assertIn("当日行情", str(ctx.exception))
+
+
+class RollRebuildTriggerTest(unittest.TestCase):
+    """滚动集必须每天首跑重建:增量文件会漏票(2026-10-22 佳力奇漏扫,37/344 候选)。"""
+
+    WIN = ["2026-10-08", "2026-10-09", "2026-10-12", "2026-10-13", "2026-10-14",
+           "2026-10-15", "2026-10-16", "2026-10-19", "2026-10-20", "2026-10-21",
+           "2026-10-22"]
+
+    def test_rebuilds_on_first_run_of_day(self):
+        path = Path(tempfile.mktemp(prefix="wd_roll_", suffix=".json"))
+        path.write_text(json.dumps(
+            {"through": "2026-10-21", "codes": {"600000": ["2026-10-08"]}}),
+            encoding="utf-8")
+        try:
+            with mock.patch.object(sel, "ROLL", path), \
+                 mock.patch.object(sel, "_index_trade_days", return_value=list(self.WIN)), \
+                 mock.patch.object(sel, "_roll_rebuild",
+                                   return_value={"codes": {"600001": ["2026-10-16"]}}) as rb:
+                got1 = sel._roll_candidates({"600002"}, "2026-10-22")
+                self.assertEqual(rb.call_count, 1, "through=昨天也必须重建")
+                self.assertEqual(got1, {"600001", "600002"})
+                saved = json.loads(path.read_text())
+                self.assertEqual(saved["through"], "2026-10-22")
+                self.assertNotIn("600000", saved["codes"], "窗口外旧票应被清理")
+                # 同日再跑:不再重复重建
+                got2 = sel._roll_candidates({"600002"}, "2026-10-22")
+                self.assertEqual(rb.call_count, 1)
+                self.assertEqual(got2, {"600001", "600002"})
+        finally:
+            path.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
